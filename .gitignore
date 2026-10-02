@@ -1,8 +1,19 @@
 # ==========================================
-# WORDPRESS CORE
+# IGNORAR TODO EL CONTENIDO DE WORDPRESS
 # ==========================================
 
-/wordpress/
+/wordpress/*
+
+
+# ==========================================
+# PERMITIR SOLO EL PLUGIN SINACIN-AFILIACIONES
+# ==========================================
+
+!/wordpress/wp-content
+/wordpress/wp-content/*
+!/wordpress/wp-content/plugins
+/wordpress/wp-content/plugins/*
+!/wordpress/wp-content/plugins/sinacin-afiliaciones
 
 
 # ==========================================
@@ -29,15 +40,9 @@ Thumbs.db
 
 
 # ==========================================
-# DEPENDENCIAS
+# DEPENDENCIAS Y LOGS
 # ==========================================
 
 node_modules/
 vendor/
-
-
-# ==========================================
-# LOGS
-# ==========================================
-
 *.log
