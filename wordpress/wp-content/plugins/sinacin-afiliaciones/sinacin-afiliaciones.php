@@ -24,6 +24,7 @@ require_once plugin_dir_path( __FILE__ ) . 'admin/empresas.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/solicitudes.php';
 require_once plugin_dir_path( __FILE__ ) . 'public/formulario.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/afiliados.php';
+require_once plugin_dir_path( __FILE__ ) . 'public/certificado.php';
 
 
 /**
