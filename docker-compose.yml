@@ -3,6 +3,7 @@ services:
   wordpress:
     image: wordpress:latest
     container_name: wordpress_profesional
+
     ports:
       - "8080:80"
 
@@ -12,8 +13,16 @@ services:
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
 
+      SINACIN_SMTP_HOST: ${SINACIN_SMTP_HOST}
+      SINACIN_SMTP_PORT: ${SINACIN_SMTP_PORT}
+      SINACIN_SMTP_USER: ${SINACIN_SMTP_USER}
+      SINACIN_SMTP_PASSWORD: ${SINACIN_SMTP_PASSWORD}
+      SINACIN_SMTP_FROM: ${SINACIN_SMTP_FROM}
+      SINACIN_SMTP_FROM_NAME: ${SINACIN_SMTP_FROM_NAME}
+
     volumes:
-      - ./wordpress:/var/www/html
+    - ./wordpress:/var/www/html
+    - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
 
     depends_on:
       - db
@@ -36,6 +45,7 @@ services:
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: wordpress_phpmyadmin
+
     ports:
       - "8081:80"
 

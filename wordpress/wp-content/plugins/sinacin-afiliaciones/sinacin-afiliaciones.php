@@ -21,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/database.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/certificados.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/correo.php';
 
 require_once plugin_dir_path( __FILE__ ) . 'admin/empresas.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/solicitudes.php';
@@ -28,6 +29,7 @@ require_once plugin_dir_path( __FILE__ ) . 'public/formulario.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/afiliados.php';
 
 require_once plugin_dir_path( __FILE__ ) . 'admin/prueba-certificado.php';
+require_once plugin_dir_path( __FILE__ ) . 'admin/prueba-correo.php';
 
 
 /**

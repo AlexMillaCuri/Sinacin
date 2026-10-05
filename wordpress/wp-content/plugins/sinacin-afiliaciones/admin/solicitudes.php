@@ -235,6 +235,7 @@ function sinacin_pagina_solicitudes() {
                             p.apellido_paterno,
                             p.apellido_materno,
                             p.rut,
+                            p.correo,
                             e.rut_empresa,
                             e.nombre_empresa,
                             e.estado AS estado_empresa
@@ -556,17 +557,199 @@ function sinacin_pagina_solicitudes() {
                             }
                             else {
 
-                                $wpdb->query(
-                                    'COMMIT'
-                                );
+    /**
+     * ==========================================
+     * CONFIRMAR TRANSACCIÓN
+     * ==========================================
+     *
+     * Desde este punto la afiliación ya está
+     * aprobada definitivamente.
+     *
+     * Si posteriormente falla el certificado
+     * o el correo, NO se hará rollback.
+     */
 
-                                $mensaje =
-                                    'Solicitud aprobada correctamente y afiliación creada.';
+    $wpdb->query(
+        'COMMIT'
+    );
 
-                                $tipo_mensaje =
-                                    'success';
 
-                            }
+    /**
+     * ==========================================
+     * GENERAR CERTIFICADO
+     * ==========================================
+     */
+
+    $resultado_certificado =
+        sinacin_generar_certificado(
+            $afiliacion_id
+        );
+
+
+    /*
+     * ==========================================
+     * CERTIFICADO GENERADO CORRECTAMENTE
+     * ==========================================
+     */
+
+    if (
+        is_array( $resultado_certificado ) &&
+        ! empty( $resultado_certificado['success'] )
+    ) {
+
+        $numero_certificado =
+            isset(
+                $resultado_certificado['numero_certificado']
+            )
+                ? $resultado_certificado['numero_certificado']
+                : '';
+
+
+        $archivo_id =
+            isset(
+                $resultado_certificado['archivo_id']
+            )
+                ? absint(
+                    $resultado_certificado['archivo_id']
+                )
+                : 0;
+
+
+        /**
+         * ==========================================
+         * OBTENER RUTA DEL PDF
+         * ==========================================
+         *
+         * El certificado recién generado puede
+         * entregar directamente la ruta.
+         *
+         * Si no la entrega, intentamos obtenerla
+         * desde el attachment de WordPress.
+         */
+
+        $ruta_pdf = '';
+
+
+        if (
+            isset(
+                $resultado_certificado['ruta_archivo']
+            ) &&
+            ! empty(
+                $resultado_certificado['ruta_archivo']
+            )
+        ) {
+
+            $ruta_pdf =
+                $resultado_certificado['ruta_archivo'];
+
+        }
+        elseif (
+            $archivo_id > 0
+        ) {
+
+            $ruta_pdf =
+                get_attached_file(
+                    $archivo_id
+                );
+
+        }
+
+
+        /**
+         * ==========================================
+         * ENVIAR CERTIFICADO POR CORREO
+         * ==========================================
+         */
+
+        $resultado_correo =
+            sinacin_enviar_certificado_por_correo(
+                $solicitud->correo,
+                $nombre_persona,
+                $ruta_pdf,
+                $numero_certificado
+            );
+
+
+        /**
+         * ==========================================
+         * RESULTADO FINAL
+         * ==========================================
+         */
+
+        if (
+            is_array( $resultado_correo ) &&
+            ! empty( $resultado_correo['success'] )
+        ) {
+
+            $mensaje =
+                sprintf(
+                    'Solicitud aprobada correctamente. Afiliación #%d creada, certificado %s generado y enviado al correo %s.',
+                    $afiliacion_id,
+                    $numero_certificado,
+                    $solicitud->correo
+                );
+
+            $tipo_mensaje =
+                'success';
+
+        }
+        else {
+
+            /*
+             * La afiliación YA está aprobada.
+             *
+             * El error de correo NO revierte
+             * la afiliación.
+             */
+
+            $mensaje =
+                sprintf(
+                    'Solicitud aprobada correctamente. Afiliación #%d creada y certificado %s generado, pero no fue posible enviar el certificado por correo. Puedes descargarlo manualmente desde Afiliados.',
+                    $afiliacion_id,
+                    $numero_certificado
+                );
+
+            $tipo_mensaje =
+                'warning';
+
+
+            error_log(
+                'SINACIN: afiliación #' .
+                $afiliacion_id .
+                ' aprobada, pero no fue posible enviar el certificado por correo.'
+            );
+
+        }
+
+    }
+    else {
+
+        /*
+         * La afiliación YA está aprobada.
+         *
+         * El error de generación del certificado
+         * NO revierte la afiliación.
+         */
+
+        $mensaje =
+            sprintf(
+                'Solicitud aprobada correctamente y afiliación #%d creada, pero no fue posible generar el certificado. Revisa el sistema y genera/descarga el certificado manualmente.',
+                $afiliacion_id
+            );
+
+        $tipo_mensaje =
+            'warning';
+
+
+        error_log(
+            'SINACIN: afiliación #' .
+            $afiliacion_id .
+            ' aprobada, pero falló la generación del certificado.'
+        );
+
+    }
+
+}
 
                         }
 
@@ -674,6 +857,7 @@ function sinacin_pagina_solicitudes() {
                             p.apellido_paterno,
                             p.apellido_materno,
                             p.rut,
+                            p.correo,
                             e.rut_empresa,
                             e.nombre_empresa
                         FROM {$tabla_solicitudes} s
@@ -1111,6 +1295,7 @@ function sinacin_pagina_solicitudes() {
             p.apellido_paterno,
             p.apellido_materno,
             p.rut,
+            p.correo,
             p.celular,
             p.correo,
             p.cargo,
@@ -1754,6 +1939,7 @@ function sinacin_mostrar_detalle_solicitud(
                     p.apellido_paterno,
                     p.apellido_materno,
                     p.rut,
+                    p.correo,
                     p.celular,
                     p.correo,
                     p.cargo,
