@@ -15,6 +15,7 @@ function sinacin_crear_tablas() {
     $charset_collate = $wpdb->get_charset_collate();
 
     $tabla_empresas       = $wpdb->prefix . 'sinacin_empresas';
+    $tabla_faenas         = $wpdb->prefix . 'sinacin_faenas';
     $tabla_personas       = $wpdb->prefix . 'sinacin_personas';
     $tabla_solicitudes    = $wpdb->prefix . 'sinacin_solicitudes';
     $tabla_afiliaciones   = $wpdb->prefix . 'sinacin_afiliaciones';
@@ -52,6 +53,37 @@ function sinacin_crear_tablas() {
         UNIQUE KEY rut_empresa (rut_empresa),
 
         KEY estado (estado)
+
+    ) $charset_collate;";
+
+
+    /*
+     * ==========================================
+     * FAENAS / OBRAS
+     * ==========================================
+     */
+
+    $sql_faenas = "CREATE TABLE $tabla_faenas (
+
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+
+        empresa_id BIGINT UNSIGNED NOT NULL,
+
+        nombre_faena VARCHAR(200) NOT NULL,
+
+        estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
+
+        fecha_registro DATETIME NOT NULL,
+
+        fecha_actualizacion DATETIME NOT NULL,
+
+        PRIMARY KEY (id),
+
+        KEY empresa_id (empresa_id),
+
+        KEY estado (estado),
+
+        KEY empresa_estado (empresa_id, estado)
 
     ) $charset_collate;";
 
@@ -107,6 +139,8 @@ function sinacin_crear_tablas() {
 
         empresa_id BIGINT UNSIGNED NOT NULL,
 
+        faena_id BIGINT UNSIGNED NOT NULL,
+
         estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
 
         acepta_terminos TINYINT(1) NOT NULL DEFAULT 0,
@@ -129,6 +163,8 @@ function sinacin_crear_tablas() {
 
         KEY empresa_id (empresa_id),
 
+        KEY faena_id (faena_id),
+
         KEY estado (estado),
 
         KEY fecha_solicitud (fecha_solicitud)
@@ -150,6 +186,8 @@ function sinacin_crear_tablas() {
 
         empresa_id BIGINT UNSIGNED NOT NULL,
 
+        faena_id BIGINT UNSIGNED NOT NULL,
+
         solicitud_id BIGINT UNSIGNED NOT NULL,
 
         estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
@@ -163,6 +201,8 @@ function sinacin_crear_tablas() {
         KEY persona_id (persona_id),
 
         KEY empresa_id (empresa_id),
+
+        KEY faena_id (faena_id),
 
         KEY solicitud_id (solicitud_id),
 
@@ -310,6 +350,8 @@ function sinacin_crear_tablas() {
      */
 
     dbDelta( $sql_empresas );
+
+    dbDelta( $sql_faenas );
 
     dbDelta( $sql_personas );
 

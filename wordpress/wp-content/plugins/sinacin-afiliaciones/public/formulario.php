@@ -175,6 +175,32 @@ function sinacin_ajax_validar_empresa() {
 
     /**
      * ------------------------------------------
+     * OBTENER FAENAS ACTIVAS DE LA EMPRESA
+     * ------------------------------------------
+     */
+
+    $tabla_faenas =
+        $wpdb->prefix . 'sinacin_faenas';
+
+    $faenas = $wpdb->get_results(
+        $wpdb->prepare(
+            "
+            SELECT
+                id,
+                nombre_faena
+            FROM {$tabla_faenas}
+            WHERE empresa_id = %d
+            AND estado = 'ACTIVA'
+            ORDER BY nombre_faena ASC
+            ",
+            (int) $empresa->id
+        ),
+        ARRAY_A
+    );
+
+
+    /**
+     * ------------------------------------------
      * EMPRESA VÁLIDA
      * ------------------------------------------
      */
@@ -183,6 +209,14 @@ function sinacin_ajax_validar_empresa() {
         array(
             'message' =>
                 'RUT de empresa validado correctamente.',
+
+            'empresa_id' =>
+                (int) $empresa->id,
+
+            'faenas' =>
+                is_array( $faenas )
+                    ? $faenas
+                    : array(),
         )
     );
 
@@ -241,6 +275,32 @@ function sinacin_mostrar_formulario() {
                 >
 
                 <small id="sinacin-empresa-mensaje"></small>
+
+            </div>
+
+
+            <!-- ==========================================
+                 FAENA / OBRA
+                 ========================================== -->
+
+            <div class="sinacin-campo">
+
+                <label for="faena_id">
+                    Faena / Obra *
+                </label>
+
+                <select
+                    id="faena_id"
+                    name="faena_id"
+                    required
+                    disabled
+                >
+                    <option value="">
+                        Selecciona una faena / obra
+                    </option>
+                </select>
+
+                <small id="sinacin-faena-mensaje"></small>
 
             </div>
 
@@ -523,7 +583,8 @@ function sinacin_mostrar_formulario() {
         .sinacin-campo input[type="text"],
         .sinacin-campo input[type="email"],
         .sinacin-campo input[type="tel"],
-        .sinacin-campo input[type="file"] {
+        .sinacin-campo input[type="file"],
+        .sinacin-campo select {
             width: 100%;
             box-sizing: border-box;
             padding: 11px 12px;
@@ -531,7 +592,8 @@ function sinacin_mostrar_formulario() {
             border-radius: 6px;
         }
 
-        .sinacin-campo input:disabled {
+        .sinacin-campo input:disabled,
+        .sinacin-campo select:disabled {
             background: #f4f4f4;
             cursor: not-allowed;
         }
@@ -629,6 +691,18 @@ function sinacin_mostrar_formulario() {
                 );
 
 
+            const faenaSelect =
+                document.getElementById(
+                    'faena_id'
+                );
+
+
+            const mensajeFaena =
+                document.getElementById(
+                    'sinacin-faena-mensaje'
+                );
+
+
             const botonEnviar =
                 document.getElementById(
                     'sinacin-boton-enviar'
@@ -643,7 +717,7 @@ function sinacin_mostrar_formulario() {
 
             const camposBloqueables =
                 formulario.querySelectorAll(
-                    'input:not(#rut_empresa)'
+                    'input:not(#rut_empresa), select:not(#rut_empresa)'
                 );
 
 
@@ -916,6 +990,53 @@ function sinacin_mostrar_formulario() {
 
             /**
              * ==========================================
+             * CARGAR FAENAS
+             * ==========================================
+             */
+
+            function cargarFaenas(faenas) {
+
+                faenaSelect.innerHTML = '';
+
+                faenaSelect.disabled = true;
+
+                mensajeFaena.textContent = '';
+
+                const opcionInicial = document.createElement('option');
+
+                opcionInicial.value = '';
+                opcionInicial.textContent =
+                    'Selecciona una faena / obra';
+
+                faenaSelect.appendChild(opcionInicial);
+
+                if ( ! Array.isArray( faenas ) || faenas.length === 0 ) {
+
+                    mensajeFaena.textContent =
+                        'La empresa no tiene faenas u obras activas registradas.';
+
+                    return;
+
+                }
+
+                faenas.forEach(function(faena) {
+
+                    const opcion = document.createElement('option');
+
+                    opcion.value = faena.id;
+                    opcion.textContent = faena.nombre_faena;
+
+                    faenaSelect.appendChild(opcion);
+
+                });
+
+                faenaSelect.disabled = false;
+
+            }
+
+
+            /**
+             * ==========================================
              * VALIDAR RUT EMPRESA
              * ==========================================
              */
@@ -930,6 +1051,11 @@ function sinacin_mostrar_formulario() {
                     empresaValida = false;
 
                     deshabilitarFormulario();
+
+                    faenaSelect.innerHTML =
+                        '<option value="">Selecciona una faena / obra</option>';
+                    faenaSelect.disabled = true;
+                    mensajeFaena.textContent = '';
 
                     mensajeEmpresa.textContent = '';
 
@@ -1024,6 +1150,9 @@ function sinacin_mostrar_formulario() {
 
                                             habilitarFormulario();
 
+                                            cargarFaenas(
+                                                data.data.faenas || []
+                                            );
 
                                             mensajeEmpresa.textContent =
                                                 'RUT de empresa validado correctamente.';
@@ -1284,6 +1413,11 @@ function sinacin_mostrar_formulario() {
 
                                 mensajeRut.textContent = '';
 
+                                faenaSelect.innerHTML =
+                                    '<option value="">Selecciona una faena / obra</option>';
+                                faenaSelect.disabled = true;
+                                mensajeFaena.textContent = '';
+
                             }
                             else {
 
@@ -1464,6 +1598,12 @@ function sinacin_procesar_solicitud() {
             : '';
 
 
+    $faena_id =
+        isset( $_POST['faena_id'] )
+            ? absint( $_POST['faena_id'] )
+            : 0;
+
+
     $acepta_terminos =
         isset(
             $_POST['acepta_terminos']
@@ -1512,6 +1652,8 @@ function sinacin_procesar_solicitud() {
         trim( $correo ) === ''
         ||
         trim( $cargo ) === ''
+        ||
+        $faena_id <= 0
     ) {
 
         sinacin_respuesta_error(
@@ -1727,6 +1869,11 @@ function sinacin_procesar_solicitud() {
         'sinacin_afiliaciones';
 
 
+    $tabla_faenas =
+        $wpdb->prefix .
+        'sinacin_faenas';
+
+
     $tabla_documentos =
         $wpdb->prefix .
         'sinacin_documentos';
@@ -1789,6 +1936,38 @@ function sinacin_procesar_solicitud() {
 
     $empresa_id =
         (int) $empresa->id;
+
+
+    /**
+     * ------------------------------------------
+     * VALIDAR FAENA ACTIVA
+     * ------------------------------------------
+     */
+
+    $faena =
+        $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT id
+                FROM {$tabla_faenas}
+                WHERE id = %d
+                AND empresa_id = %d
+                AND estado = 'ACTIVA'
+                LIMIT 1
+                ",
+                $faena_id,
+                $empresa_id
+            )
+        );
+
+
+    if ( ! $faena ) {
+
+        sinacin_respuesta_error(
+            'La faena u obra seleccionada no es válida para la empresa ingresada.'
+        );
+
+    }
 
 
     /**
@@ -2278,6 +2457,9 @@ function sinacin_procesar_solicitud() {
                     'empresa_id' =>
                         $empresa_id,
 
+                    'faena_id' =>
+                        $faena_id,
+
                     'estado' =>
                         'PENDIENTE',
 
@@ -2299,6 +2481,7 @@ function sinacin_procesar_solicitud() {
                 ),
 
                 array(
+                    '%d',
                     '%d',
                     '%d',
                     '%s',

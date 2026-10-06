@@ -304,6 +304,10 @@ function sinacin_normalizar_ruts_empresas_existentes() {
         $wpdb->prefix .
         'sinacin_empresas';
 
+    $tabla_faenas =
+        $wpdb->prefix .
+        'sinacin_faenas';
+
 
     $empresas =
         $wpdb->get_results(
@@ -408,6 +412,10 @@ function sinacin_pagina_empresas() {
     $tabla_empresas =
         $wpdb->prefix .
         'sinacin_empresas';
+
+    $tabla_faenas =
+        $wpdb->prefix .
+        'sinacin_faenas';
 
 
     /**
@@ -932,6 +940,199 @@ function sinacin_pagina_empresas() {
 
     /**
      * ==========================================
+     * PROCESAR FAENAS
+     * ==========================================
+     */
+
+    $empresa_faenas_id = isset( $_GET['empresa_faenas'] )
+        ? absint( $_GET['empresa_faenas'] )
+        : 0;
+
+    if ( isset( $_POST['sinacin_guardar_faena'] ) ) {
+
+        if (
+            ! isset( $_POST['sinacin_faena_nonce'] )
+            || ! wp_verify_nonce(
+                sanitize_text_field( wp_unslash( $_POST['sinacin_faena_nonce'] ) ),
+                'sinacin_guardar_faena'
+            )
+        ) {
+            $mensaje = 'La sesión de seguridad no es válida.';
+            $tipo_mensaje = 'error';
+        } else {
+            $faena_id = isset( $_POST['faena_id'] ) ? absint( $_POST['faena_id'] ) : 0;
+            $empresa_id = isset( $_POST['empresa_id_faena'] ) ? absint( $_POST['empresa_id_faena'] ) : 0;
+            $nombre_faena = isset( $_POST['nombre_faena'] )
+                ? trim( sanitize_text_field( wp_unslash( $_POST['nombre_faena'] ) ) )
+                : '';
+            $estado_faena = isset( $_POST['estado_faena'] )
+                ? sanitize_text_field( wp_unslash( $_POST['estado_faena'] ) )
+                : 'ACTIVA';
+
+            if ( ! in_array( $estado_faena, array( 'ACTIVA', 'INACTIVA' ), true ) ) {
+                $estado_faena = 'ACTIVA';
+            }
+
+            if ( $empresa_id <= 0 ) {
+                $mensaje = 'La empresa indicada no es válida.';
+                $tipo_mensaje = 'error';
+            } elseif ( $nombre_faena === '' ) {
+                $mensaje = 'El nombre de la faena es obligatorio.';
+                $tipo_mensaje = 'error';
+            } else {
+                $empresa_existe = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT id FROM {$tabla_empresas} WHERE id = %d LIMIT 1",
+                        $empresa_id
+                    )
+                );
+
+                if ( ! $empresa_existe ) {
+                    $mensaje = 'La empresa no existe.';
+                    $tipo_mensaje = 'error';
+                } else {
+                    $duplicada = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT id FROM {$tabla_faenas} WHERE empresa_id = %d AND nombre_faena = %s AND id != %d LIMIT 1",
+                            $empresa_id,
+                            $nombre_faena,
+                            $faena_id
+                        )
+                    );
+
+                    if ( $duplicada ) {
+                        $mensaje = 'Ya existe una faena con ese nombre en esta empresa.';
+                        $tipo_mensaje = 'error';
+                    } elseif ( $faena_id > 0 ) {
+                        $resultado = $wpdb->update(
+                            $tabla_faenas,
+                            array(
+                                'empresa_id' => $empresa_id,
+                                'nombre_faena' => $nombre_faena,
+                                'estado' => $estado_faena,
+                                'fecha_actualizacion' => current_time( 'mysql' ),
+                            ),
+                            array( 'id' => $faena_id ),
+                            array( '%d', '%s', '%s', '%s' ),
+                            array( '%d' )
+                        );
+
+                        if ( $resultado !== false ) {
+                            $mensaje = 'Faena actualizada correctamente.';
+                            $tipo_mensaje = 'success';
+                            $empresa_faenas_id = $empresa_id;
+                        } else {
+                            $mensaje = 'No fue posible actualizar la faena.';
+                            $tipo_mensaje = 'error';
+                        }
+                    } else {
+                        $resultado = $wpdb->insert(
+                            $tabla_faenas,
+                            array(
+                                'empresa_id' => $empresa_id,
+                                'nombre_faena' => $nombre_faena,
+                                'estado' => $estado_faena,
+                                'fecha_registro' => current_time( 'mysql' ),
+                                'fecha_actualizacion' => current_time( 'mysql' ),
+                            ),
+                            array( '%d', '%s', '%s', '%s', '%s' )
+                        );
+
+                        if ( $resultado !== false ) {
+                            $mensaje = 'Faena registrada correctamente.';
+                            $tipo_mensaje = 'success';
+                            $empresa_faenas_id = $empresa_id;
+                        } else {
+                            $mensaje = 'No fue posible registrar la faena.';
+                            $tipo_mensaje = 'error';
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (
+        isset( $_GET['accion'] )
+        && $_GET['accion'] === 'cambiar_estado_faena'
+        && isset( $_GET['id'] )
+        && isset( $_GET['empresa_faenas'] )
+    ) {
+        $faena_id = absint( $_GET['id'] );
+        $empresa_id = absint( $_GET['empresa_faenas'] );
+
+        if (
+            ! isset( $_GET['_wpnonce'] )
+            || ! wp_verify_nonce(
+                sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ),
+                'sinacin_cambiar_estado_faena_' . $faena_id
+            )
+        ) {
+            $mensaje = 'La sesión de seguridad no es válida.';
+            $tipo_mensaje = 'error';
+        } else {
+            $estado_actual = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT estado FROM {$tabla_faenas} WHERE id = %d AND empresa_id = %d LIMIT 1",
+                    $faena_id,
+                    $empresa_id
+                )
+            );
+
+            if ( ! $estado_actual ) {
+                $mensaje = 'La faena no existe.';
+                $tipo_mensaje = 'error';
+            } else {
+                $nuevo_estado = ( $estado_actual === 'ACTIVA' ) ? 'INACTIVA' : 'ACTIVA';
+                $resultado = $wpdb->update(
+                    $tabla_faenas,
+                    array(
+                        'estado' => $nuevo_estado,
+                        'fecha_actualizacion' => current_time( 'mysql' ),
+                    ),
+                    array( 'id' => $faena_id ),
+                    array( '%s', '%s' ),
+                    array( '%d' )
+                );
+
+                if ( $resultado !== false ) {
+                    $mensaje = 'Estado de la faena actualizado correctamente.';
+                    $tipo_mensaje = 'success';
+                } else {
+                    $mensaje = 'No fue posible actualizar el estado de la faena.';
+                    $tipo_mensaje = 'error';
+                }
+            }
+        }
+    }
+
+    /**
+     * ==========================================
+     * EDITAR FAENA
+     * ==========================================
+     */
+
+    $faena_editar = null;
+
+    if (
+        $empresa_faenas_id > 0
+        && isset( $_GET['editar_faena'] )
+    ) {
+        $faena_editar_id = absint( $_GET['editar_faena'] );
+
+        if ( $faena_editar_id > 0 ) {
+            $faena_editar = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$tabla_faenas} WHERE id = %d AND empresa_id = %d LIMIT 1",
+                    $faena_editar_id,
+                    $empresa_faenas_id
+                )
+            );
+        }
+    }
+
+    /**
+     * ==========================================
      * EDITAR EMPRESA
      * ==========================================
      */
@@ -1409,9 +1610,524 @@ function sinacin_pagina_empresas() {
         </div>
 
 
+        <?php
+        /*
+         * ==========================================
+         * MODAL DE FAENAS / OBRAS
+         * ==========================================
+         */
+        ?>
+
+        <style>
+            .sinacin-modal-overlay {
+                display: none;
+                position: fixed;
+                z-index: 99999;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.55);
+                padding: 40px 20px;
+                overflow-y: auto;
+                box-sizing: border-box;
+            }
+
+            .sinacin-modal-overlay.is-open {
+                display: flex;
+                align-items: flex-start;
+                justify-content: center;
+            }
+
+            .sinacin-modal {
+                position: relative;
+                width: 100%;
+                max-width: 1000px;
+                background: #fff;
+                border-radius: 6px;
+                box-shadow: 0 15px 45px rgba(0, 0, 0, 0.25);
+                box-sizing: border-box;
+            }
+
+            .sinacin-modal-header {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 20px;
+                padding: 20px 24px;
+                border-bottom: 1px solid #dcdcde;
+            }
+
+            .sinacin-modal-header h2 {
+                margin: 0 0 5px;
+                font-size: 22px;
+            }
+
+            .sinacin-modal-header p {
+                margin: 0;
+                color: #646970;
+            }
+
+            .sinacin-modal-close {
+                border: 0;
+                background: transparent;
+                color: #646970;
+                cursor: pointer;
+                font-size: 28px;
+                line-height: 1;
+                padding: 0 4px;
+            }
+
+            .sinacin-modal-close:hover {
+                color: #1d2327;
+            }
+
+            .sinacin-modal-body {
+                padding: 24px;
+            }
+
+            .sinacin-faena-form {
+                background: #f6f7f7;
+                border: 1px solid #dcdcde;
+                padding: 18px;
+                margin-bottom: 24px;
+            }
+
+            .sinacin-faena-form h3 {
+                margin-top: 0;
+            }
+
+            .sinacin-faena-form .form-table {
+                margin: 0 0 10px;
+            }
+
+            .sinacin-faena-table th,
+            .sinacin-faena-table td {
+                vertical-align: middle;
+            }
+
+            .sinacin-modal-footer {
+                padding: 15px 24px;
+                border-top: 1px solid #dcdcde;
+                text-align: right;
+            }
+
+            body.sinacin-modal-open {
+                overflow: hidden;
+            }
+        </style>
+
+        <?php
+        $empresa_faenas = null;
+        $faenas = array();
+
+        if ( $empresa_faenas_id > 0 ) {
+
+            $empresa_faenas = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$tabla_empresas} WHERE id = %d LIMIT 1",
+                    $empresa_faenas_id
+                )
+            );
+
+            if ( $empresa_faenas ) {
+                $faenas = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT * FROM {$tabla_faenas} WHERE empresa_id = %d ORDER BY id DESC",
+                        $empresa_faenas_id
+                    )
+                );
+            }
+        }
+        ?>
+
+        <div
+            id="sinacin-faenas-modal"
+            class="sinacin-modal-overlay"
+            aria-hidden="true"
+        >
+
+            <div
+                class="sinacin-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="sinacin-faenas-modal-title"
+            >
+
+                <?php if ( $empresa_faenas ) : ?>
+
+                    <div class="sinacin-modal-header">
+
+                        <div>
+                            <h2 id="sinacin-faenas-modal-title">
+                                Faenas / Obras
+                            </h2>
+
+                            <p>
+                                <strong>
+                                    <?php echo esc_html( $empresa_faenas->nombre_empresa ); ?>
+                                </strong>
+
+                                &nbsp;|&nbsp;
+
+                                RUT:
+                                <?php echo esc_html( sinacin_formatear_rut( $empresa_faenas->rut_empresa ) ); ?>
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="sinacin-modal-close"
+                            aria-label="Cerrar"
+                        >
+                            &times;
+                        </button>
+
+                    </div>
+
+                    <div class="sinacin-modal-body">
+
+                        <div class="sinacin-faena-form">
+
+                            <h3>
+                                <?php echo $faena_editar ? 'Editar faena' : 'Nueva faena'; ?>
+                            </h3>
+
+                            <form method="post">
+
+                                <?php wp_nonce_field( 'sinacin_guardar_faena', 'sinacin_faena_nonce' ); ?>
+
+                                <input
+                                    type="hidden"
+                                    name="sinacin_guardar_faena"
+                                    value="1"
+                                >
+
+                                <input
+                                    type="hidden"
+                                    name="faena_id"
+                                    value="<?php echo $faena_editar ? esc_attr( $faena_editar->id ) : '0'; ?>"
+                                >
+
+                                <input
+                                    type="hidden"
+                                    name="empresa_id_faena"
+                                    value="<?php echo esc_attr( $empresa_faenas_id ); ?>"
+                                >
+
+                                <table class="form-table" role="presentation">
+
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="nombre_faena">
+                                                Nombre de la faena / obra
+                                            </label>
+                                        </th>
+
+                                        <td>
+                                            <input
+                                                type="text"
+                                                id="nombre_faena"
+                                                name="nombre_faena"
+                                                class="regular-text"
+                                                maxlength="200"
+                                                required
+                                                value="<?php echo $faena_editar ? esc_attr( $faena_editar->nombre_faena ) : ''; ?>"
+                                                placeholder="Ej.: Proyecto Hospital Norte"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="estado_faena">
+                                                Estado
+                                            </label>
+                                        </th>
+
+                                        <td>
+                                            <select
+                                                id="estado_faena"
+                                                name="estado_faena"
+                                            >
+                                                <option
+                                                    value="ACTIVA"
+                                                    <?php selected( $faena_editar ? $faena_editar->estado : 'ACTIVA', 'ACTIVA' ); ?>
+                                                >
+                                                    ACTIVA
+                                                </option>
+
+                                                <option
+                                                    value="INACTIVA"
+                                                    <?php selected( $faena_editar ? $faena_editar->estado : '', 'INACTIVA' ); ?>
+                                                >
+                                                    INACTIVA
+                                                </option>
+                                            </select>
+                                        </td>
+                                    </tr>
+
+                                </table>
+
+                                <?php
+                                submit_button(
+                                    $faena_editar
+                                        ? 'Actualizar faena'
+                                        : 'Crear faena',
+                                    'primary',
+                                    'submit',
+                                    false
+                                );
+                                ?>
+
+                                <?php if ( $faena_editar ) : ?>
+
+                                    <a
+                                        href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin', 'empresa_faenas' => $empresa_faenas_id ), admin_url( 'admin.php' ) ) ); ?>"
+                                        class="button"
+                                    >
+                                        Cancelar edición
+                                    </a>
+
+                                <?php endif; ?>
+
+                            </form>
+
+                        </div>
+
+                        <h3>
+                            Faenas registradas
+                        </h3>
+
+                        <table class="wp-list-table widefat fixed striped sinacin-faena-table">
+
+                            <thead>
+                                <tr>
+                                    <th style="width:70px;">ID</th>
+                                    <th>Faena / Obra</th>
+                                    <th style="width:120px;">Estado</th>
+                                    <th style="width:170px;">Fecha registro</th>
+                                    <th style="width:220px;">Acciones</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+
+                                <?php if ( empty( $faenas ) ) : ?>
+
+                                    <tr>
+                                        <td colspan="5">
+                                            No hay faenas registradas para esta empresa.
+                                        </td>
+                                    </tr>
+
+                                <?php else : ?>
+
+                                    <?php foreach ( $faenas as $faena ) : ?>
+
+                                        <tr>
+
+                                            <td>
+                                                <?php echo esc_html( $faena->id ); ?>
+                                            </td>
+
+                                            <td>
+                                                <strong>
+                                                    <?php echo esc_html( $faena->nombre_faena ); ?>
+                                                </strong>
+                                            </td>
+
+                                            <td>
+
+                                                <?php if ( $faena->estado === 'ACTIVA' ) : ?>
+
+                                                    <span style="display:inline-block;background:#d1e7dd;color:#0f5132;padding:4px 8px;border-radius:4px;font-weight:600;">
+                                                        ACTIVA
+                                                    </span>
+
+                                                <?php else : ?>
+
+                                                    <span style="display:inline-block;background:#f8d7da;color:#842029;padding:4px 8px;border-radius:4px;font-weight:600;">
+                                                        INACTIVA
+                                                    </span>
+
+                                                <?php endif; ?>
+
+                                            </td>
+
+                                            <td>
+                                                <?php echo esc_html( $faena->fecha_registro ); ?>
+                                            </td>
+
+                                            <td>
+
+                                                <a
+                                                    href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin', 'empresa_faenas' => $empresa_faenas_id, 'editar_faena' => $faena->id ), admin_url( 'admin.php' ) ) ); ?>"
+                                                    class="button button-small"
+                                                >
+                                                    Editar
+                                                </a>
+
+                                                <?php
+                                                $url_estado_faena = wp_nonce_url(
+                                                    add_query_arg(
+                                                        array(
+                                                            'page'           => 'sinacin',
+                                                            'empresa_faenas' => $empresa_faenas_id,
+                                                            'accion'         => 'cambiar_estado_faena',
+                                                            'id'             => $faena->id,
+                                                        ),
+                                                        admin_url( 'admin.php' )
+                                                    ),
+                                                    'sinacin_cambiar_estado_faena_' . $faena->id
+                                                );
+                                                ?>
+
+                                                <a
+                                                    href="<?php echo esc_url( $url_estado_faena ); ?>"
+                                                    class="button button-small"
+                                                >
+                                                    <?php echo $faena->estado === 'ACTIVA' ? 'Desactivar' : 'Activar'; ?>
+                                                </a>
+
+                                            </td>
+
+                                        </tr>
+
+                                    <?php endforeach; ?>
+
+                                <?php endif; ?>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    <div class="sinacin-modal-footer">
+
+                        <button
+                            type="button"
+                            class="button sinacin-modal-close"
+                        >
+                            Cerrar
+                        </button>
+
+                    </div>
+
+                <?php else : ?>
+
+                    <div class="sinacin-modal-header">
+
+                        <h2 id="sinacin-faenas-modal-title">
+                            Faenas / Obras
+                        </h2>
+
+                        <button
+                            type="button"
+                            class="sinacin-modal-close"
+                            aria-label="Cerrar"
+                        >
+                            &times;
+                        </button>
+
+                    </div>
+
+                    <div class="sinacin-modal-body">
+                        <div class="notice notice-error inline">
+                            <p>La empresa seleccionada no existe.</p>
+                        </div>
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+
+                const modal = document.getElementById('sinacin-faenas-modal');
+
+                if (!modal) {
+                    return;
+                }
+
+                const closeButtons = modal.querySelectorAll('.sinacin-modal-close');
+
+                function abrirModal() {
+                    modal.classList.add('is-open');
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.classList.add('sinacin-modal-open');
+                }
+
+                function cerrarModal() {
+                    modal.classList.remove('is-open');
+                    modal.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('sinacin-modal-open');
+
+                    // Al cerrar el modal, limpiamos el parámetro de la empresa
+                    // para que la siguiente apertura no reutilice la empresa anterior.
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('empresa_faenas');
+                    url.searchParams.delete('editar_faena');
+                    url.searchParams.delete('accion');
+                    url.searchParams.delete('id');
+                    url.searchParams.delete('_wpnonce');
+                    window.history.replaceState({}, '', url.toString());
+                }
+
+                closeButtons.forEach(function (button) {
+                    button.addEventListener('click', cerrarModal);
+                });
+
+                modal.addEventListener('click', function (event) {
+                    if (event.target === modal) {
+                        cerrarModal();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+                        cerrarModal();
+                    }
+                });
+
+                document.querySelectorAll('.sinacin-abrir-faenas').forEach(function (button) {
+                    button.addEventListener('click', function (event) {
+                        event.preventDefault();
+
+                        const url = button.getAttribute('href');
+
+                        if (!url) {
+                            return;
+                        }
+
+                        const urlDestino = new URL(url, window.location.origin);
+                        const urlActual = new URL(window.location.href);
+
+                        const empresaDestino = urlDestino.searchParams.get('empresa_faenas');
+                        const empresaActual = urlActual.searchParams.get('empresa_faenas');
+
+                        // El contenido del modal se genera en PHP.
+                        // Si cambia la empresa, debemos recargar la página para que
+                        // PHP cargue las faenas de la empresa correcta.
+                        if (empresaDestino !== empresaActual) {
+                            window.location.href = urlDestino.toString();
+                            return;
+                        }
+
+                        abrirModal();
+                    });
+                });
+
+                <?php if ( $empresa_faenas_id > 0 ) : ?>
+                    abrirModal();
+                <?php endif; ?>
+
+            });
+        </script>
+
         <!-- ==========================================
-             BUSCADOR
-             ========================================== -->
+             BUSCADOR================================= -->
 
         <form
             method="get"
@@ -1496,6 +2212,10 @@ function sinacin_pagina_empresas() {
                         Empresa
                     </th>
 
+                    <th style="width:110px;">
+                        Faenas
+                    </th>
+
                     <th
                         style="width:120px;"
                     >
@@ -1509,7 +2229,7 @@ function sinacin_pagina_empresas() {
                     </th>
 
                     <th
-                        style="width:220px;"
+                        style="width:240px;"
                     >
                         Acciones
                     </th>
@@ -1526,7 +2246,7 @@ function sinacin_pagina_empresas() {
                     <tr>
 
                         <td
-                            colspan="6"
+                            colspan="7"
                         >
 
                             No se encontraron empresas.
@@ -1583,6 +2303,36 @@ function sinacin_pagina_empresas() {
                                 );
 
                                 ?>
+
+                            </td>
+
+
+                            <td>
+
+                                <?php
+                                $cantidad_faenas = (int) $wpdb->get_var(
+                                    $wpdb->prepare(
+                                        "SELECT COUNT(*) FROM {$tabla_faenas} WHERE empresa_id = %d",
+                                        $empresa->id
+                                    )
+                                );
+
+                                $url_faenas = add_query_arg(
+                                    array(
+                                        'page'           => 'sinacin',
+                                        'empresa_faenas' => $empresa->id,
+                                    ),
+                                    admin_url( 'admin.php' )
+                                );
+                                ?>
+
+                                <a
+                                    href="<?php echo esc_url( $url_faenas ); ?>"
+                                    class="button button-small sinacin-abrir-faenas"
+                                >
+                                    <?php echo esc_html( $cantidad_faenas ); ?>
+                                    <?php echo $cantidad_faenas === 1 ? 'faena' : 'faenas'; ?>
+                                </a>
 
                             </td>
 

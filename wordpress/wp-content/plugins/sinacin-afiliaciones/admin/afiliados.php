@@ -186,7 +186,7 @@ function sinacin_procesar_desafiliacion() {
     $actualizado = $wpdb->update(
         $tabla_afiliaciones,
         array(
-            'estado'             => 'DESAFILIADA',
+            'estado'              => 'DESAFILIADA',
             'fecha_desafiliacion' => $fecha_actual,
         ),
         array(
@@ -217,14 +217,16 @@ function sinacin_procesar_desafiliacion() {
         $tabla_historial,
         array(
             'usuario_id'  => $usuario_id,
-            'entidad'    => 'AFILIACION',
-            'entidad_id' => $afiliacion_id,
-            'accion'     => 'DESAFILIAR',
-            'descripcion'=> 'Afiliación marcada como DESAFILIADA.',
-            'ip'         => isset( $_SERVER['REMOTE_ADDR'] )
-                ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+            'entidad'     => 'AFILIACION',
+            'entidad_id'  => $afiliacion_id,
+            'accion'      => 'DESAFILIAR',
+            'descripcion' => 'Afiliación marcada como DESAFILIADA.',
+            'ip'          => isset( $_SERVER['REMOTE_ADDR'] )
+                ? sanitize_text_field(
+                    wp_unslash( $_SERVER['REMOTE_ADDR'] )
+                )
                 : null,
-            'fecha'      => $fecha_actual,
+            'fecha'       => $fecha_actual,
         ),
         array(
             '%d',
@@ -237,16 +239,15 @@ function sinacin_procesar_desafiliacion() {
         )
     );
 
-    wp_safe_redirect(
-        add_query_arg(
-            array(
-                'page' => 'sinacin-afiliados',
-                'sinacin_mensaje' => 'desafiliado',
-            ),
-            admin_url( 'admin.php' )
-        )
+    $url = add_query_arg(
+        array(
+            'page'            => 'sinacin-afiliados',
+            'sinacin_mensaje' => 'actualizado',
+        ),
+        admin_url( 'admin.php' )
     );
 
+    wp_redirect( $url );
     exit;
 }
 
@@ -259,6 +260,7 @@ add_action(
     'admin_init',
     'sinacin_procesar_edicion_afiliado'
 );
+
 
 function sinacin_procesar_edicion_afiliado() {
 
@@ -294,19 +296,37 @@ function sinacin_procesar_edicion_afiliado() {
     $tabla_personas =
         $wpdb->prefix . 'sinacin_personas';
 
+    $tabla_afiliaciones =
+        $wpdb->prefix . 'sinacin_afiliaciones';
+
+    $tabla_faenas =
+        $wpdb->prefix . 'sinacin_faenas';
+
     $tabla_historial =
         $wpdb->prefix . 'sinacin_historial';
+
+
+    /*
+     * Obtener ID de persona.
+     */
 
     $persona_id =
         isset( $_POST['persona_id'] )
             ? absint( $_POST['persona_id'] )
             : 0;
 
+
     if ( ! $persona_id ) {
+
         wp_die(
             'Persona no válida.'
         );
     }
+
+
+    /*
+     * Obtener persona.
+     */
 
     $persona = $wpdb->get_row(
         $wpdb->prepare(
@@ -320,11 +340,126 @@ function sinacin_procesar_edicion_afiliado() {
         )
     );
 
+
     if ( ! $persona ) {
+
         wp_die(
             'La persona no existe.'
         );
     }
+
+
+    /*
+     * Obtener afiliación activa.
+     *
+     * La empresa NO se modifica desde esta pantalla.
+     * La empresa se obtiene directamente desde la afiliación.
+     */
+
+    $afiliacion = $wpdb->get_row(
+        $wpdb->prepare(
+            "
+            SELECT *
+            FROM {$tabla_afiliaciones}
+            WHERE persona_id = %d
+              AND estado = 'ACTIVA'
+            ORDER BY id DESC
+            LIMIT 1
+            ",
+            $persona_id
+        )
+    );
+
+
+    if ( ! $afiliacion ) {
+
+        wp_die(
+            'No se encontró una afiliación activa para esta persona.'
+        );
+    }
+
+
+    /*
+     * Obtener nueva faena.
+     */
+
+    $faena_id =
+        isset( $_POST['faena_id'] )
+            ? absint( $_POST['faena_id'] )
+            : 0;
+
+
+    if ( ! $faena_id ) {
+
+        wp_die(
+            'Debe seleccionar una faena u obra.'
+        );
+    }
+
+
+    /*
+     * Verificar que la faena exista,
+     * esté activa y pertenezca a la misma empresa
+     * de la afiliación.
+     */
+
+    $faena = $wpdb->get_row(
+        $wpdb->prepare(
+            "
+            SELECT *
+            FROM {$tabla_faenas}
+            WHERE id = %d
+              AND empresa_id = %d
+              AND estado = 'ACTIVA'
+            LIMIT 1
+            ",
+            $faena_id,
+            $afiliacion->empresa_id
+        )
+    );
+
+
+    if ( ! $faena ) {
+
+        wp_die(
+            'La faena seleccionada no es válida o no pertenece a la empresa del afiliado.'
+        );
+    }
+
+
+    /*
+     * Guardar faena anterior.
+     */
+
+    $faena_anterior_id =
+        absint(
+            $afiliacion->faena_id
+        );
+
+
+    $faena_anterior =
+        $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT nombre_faena
+                FROM {$tabla_faenas}
+                WHERE id = %d
+                LIMIT 1
+                ",
+                $faena_anterior_id
+            )
+        );
+
+
+    $nombre_faena_anterior =
+        $faena_anterior
+            ? $faena_anterior->nombre_faena
+            : 'Sin faena';
+
+
+    /*
+     * Datos personales.
+     */
 
     $nombres =
         isset( $_POST['nombres'] )
@@ -368,6 +503,11 @@ function sinacin_procesar_edicion_afiliado() {
             )
             : '';
 
+
+    /*
+     * Validar campos personales.
+     */
+
     if (
         $nombres === ''
         ||
@@ -381,28 +521,36 @@ function sinacin_procesar_edicion_afiliado() {
         ||
         $cargo === ''
     ) {
+
         wp_die(
             'Todos los campos son obligatorios.'
         );
     }
 
+
     if (
         ! is_email( $correo )
     ) {
+
         wp_die(
             'El correo electrónico no es válido.'
         );
     }
 
-    $actualizado = $wpdb->update(
+
+    /*
+     * Actualizar persona.
+     */
+
+    $actualizado_persona = $wpdb->update(
         $tabla_personas,
         array(
-            'nombres'           => $nombres,
-            'apellido_paterno' => $apellido_paterno,
-            'apellido_materno' => $apellido_materno,
-            'celular'          => $celular,
-            'correo'           => $correo,
-            'cargo'            => $cargo,
+            'nombres'             => $nombres,
+            'apellido_paterno'   => $apellido_paterno,
+            'apellido_materno'   => $apellido_materno,
+            'celular'            => $celular,
+            'correo'             => $correo,
+            'cargo'              => $cargo,
             'fecha_actualizacion' => current_time( 'mysql' ),
         ),
         array(
@@ -422,14 +570,53 @@ function sinacin_procesar_edicion_afiliado() {
         )
     );
 
-    if ( $actualizado === false ) {
+
+    if ( $actualizado_persona === false ) {
+
         wp_die(
-            'No fue posible actualizar el afiliado.'
+            'No fue posible actualizar los datos del afiliado.'
         );
     }
 
+
     /*
-     * Registrar historial.
+     * Actualizar faena de la afiliación.
+     */
+
+    $faena_cambio =
+        $faena_anterior_id !== $faena_id;
+
+
+    if ( $faena_cambio ) {
+
+        $actualizado_faena = $wpdb->update(
+            $tabla_afiliaciones,
+            array(
+                'faena_id' => $faena_id,
+            ),
+            array(
+                'id' => $afiliacion->id,
+            ),
+            array(
+                '%d',
+            ),
+            array(
+                '%d',
+            )
+        );
+
+
+        if ( $actualizado_faena === false ) {
+
+            wp_die(
+                'Los datos personales fueron actualizados, pero no fue posible actualizar la faena.'
+            );
+        }
+    }
+
+
+    /*
+     * Registrar historial de edición de persona.
      */
 
     $wpdb->insert(
@@ -460,15 +647,326 @@ function sinacin_procesar_edicion_afiliado() {
         )
     );
 
+
+    /*
+     * Registrar cambio de faena solamente
+     * cuando realmente cambió.
+     */
+
+    if ( $faena_cambio ) {
+
+        $wpdb->insert(
+            $tabla_historial,
+            array(
+                'usuario_id'  => get_current_user_id(),
+                'entidad'     => 'AFILIACION',
+                'entidad_id'  => $afiliacion->id,
+                'accion'      => 'CAMBIAR_FAENA',
+                'descripcion' =>
+                    'Cambio de faena desde "' .
+                    $nombre_faena_anterior .
+                    '" a "' .
+                    $faena->nombre_faena .
+                    '".',
+                'ip'          => isset( $_SERVER['REMOTE_ADDR'] )
+                    ? sanitize_text_field(
+                        wp_unslash(
+                            $_SERVER['REMOTE_ADDR']
+                        )
+                    )
+                    : null,
+                'fecha'       => current_time( 'mysql' ),
+            ),
+            array(
+                '%d',
+                '%s',
+                '%d',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+            )
+        );
+    }
+
     wp_safe_redirect(
         add_query_arg(
             array(
-                'page' => 'sinacin-afiliados',
+                'page'            => 'sinacin-afiliados',
                 'sinacin_mensaje' => 'actualizado',
-                'afiliado' => $persona_id,
+                'afiliado'        => $persona_id,
             ),
             admin_url( 'admin.php' )
         )
+    );
+    exit;
+}
+
+
+
+/* =========================================================
+ * DESCARGAR CERTIFICADO
+ * ========================================================= */
+
+add_action(
+    'admin_init',
+    'sinacin_descargar_certificado'
+);
+
+function sinacin_descargar_certificado() {
+
+    if (
+        ! isset( $_GET['sinacin_descargar_certificado'] )
+    ) {
+        return;
+    }
+
+    /*
+     * Verificar permisos.
+     */
+
+    if (
+        ! current_user_can( 'manage_options' )
+    ) {
+        wp_die(
+            'No tienes permisos para descargar este certificado.'
+        );
+    }
+
+    /*
+     * Verificar nonce.
+     */
+
+    if (
+        ! isset( $_GET['sinacin_certificado_nonce'] )
+        ||
+        ! wp_verify_nonce(
+            $_GET['sinacin_certificado_nonce'],
+            'sinacin_descargar_certificado'
+        )
+    ) {
+        wp_die(
+            'La solicitud de seguridad no es válida.'
+        );
+    }
+
+    /*
+     * Obtener ID de afiliación.
+     */
+
+    $afiliacion_id =
+        isset( $_GET['afiliacion_id'] )
+            ? absint(
+                $_GET['afiliacion_id']
+            )
+            : 0;
+
+    if ( ! $afiliacion_id ) {
+        wp_die(
+            'Afiliación no válida.'
+        );
+    }
+
+    global $wpdb;
+
+    $tabla_certificados =
+        $wpdb->prefix . 'sinacin_certificados';
+
+    $tabla_afiliaciones =
+        $wpdb->prefix . 'sinacin_afiliaciones';
+
+    /*
+     * Buscar certificado asociado
+     * a la afiliación.
+     */
+
+    $certificado =
+        $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT
+                    c.id,
+                    c.afiliacion_id,
+                    c.numero_certificado,
+                    c.archivo_id,
+                    c.estado,
+
+                    a.estado AS estado_afiliacion
+
+                FROM {$tabla_certificados} c
+
+                INNER JOIN {$tabla_afiliaciones} a
+                    ON a.id = c.afiliacion_id
+
+                WHERE c.afiliacion_id = %d
+
+                ORDER BY
+                    c.id DESC
+
+                LIMIT 1
+                ",
+                $afiliacion_id
+            )
+        );
+
+    /*
+     * Verificar que exista.
+     */
+
+    if ( ! $certificado ) {
+
+        wp_die(
+            'No existe un certificado asociado a esta afiliación.'
+        );
+    }
+
+    /*
+     * Verificar que tenga archivo.
+     */
+
+    if ( empty( $certificado->archivo_id ) ) {
+
+        wp_die(
+            'El certificado existe, pero no tiene un archivo PDF asociado.'
+        );
+    }
+
+    /*
+     * Obtener ruta física del archivo.
+     */
+
+    $ruta_pdf =
+        get_attached_file(
+            absint(
+                $certificado->archivo_id
+            )
+        );
+
+    if (
+        empty( $ruta_pdf )
+        ||
+        ! file_exists( $ruta_pdf )
+    ) {
+
+        wp_die(
+            'No fue posible encontrar el archivo PDF del certificado.'
+        );
+    }
+
+    /*
+     * Verificar que realmente sea PDF.
+     */
+
+    $tipo_mime =
+        get_post_mime_type(
+            absint(
+                $certificado->archivo_id
+            )
+        );
+
+    if (
+        $tipo_mime !== 'application/pdf'
+    ) {
+
+        wp_die(
+            'El archivo asociado al certificado no es un PDF válido.'
+        );
+    }
+
+    /*
+     * Registrar descarga en historial.
+     */
+
+    $tabla_historial =
+        $wpdb->prefix . 'sinacin_historial';
+
+    $wpdb->insert(
+        $tabla_historial,
+        array(
+            'usuario_id'  => get_current_user_id(),
+            'entidad'     => 'CERTIFICADO',
+            'entidad_id'  => $certificado->id,
+            'accion'      => 'DESCARGAR_CERTIFICADO',
+            'descripcion' =>
+                'Descarga del certificado ' .
+                $certificado->numero_certificado .
+                '.',
+            'ip' =>
+                isset( $_SERVER['REMOTE_ADDR'] )
+                    ? sanitize_text_field(
+                        wp_unslash(
+                            $_SERVER['REMOTE_ADDR']
+                        )
+                    )
+                    : null,
+            'fecha' =>
+                current_time( 'mysql' ),
+        ),
+        array(
+            '%d',
+            '%s',
+            '%d',
+            '%s',
+            '%s',
+            '%s',
+            '%s',
+        )
+    );
+
+    /*
+     * Limpiar buffers antes de enviar
+     * el archivo.
+     */
+
+    while (
+        ob_get_level()
+    ) {
+        ob_end_clean();
+    }
+
+    /*
+     * Nombre final del archivo.
+     */
+
+    $nombre_archivo =
+        sanitize_file_name(
+            $certificado->numero_certificado .
+            '.pdf'
+        );
+
+    /*
+     * Cabeceras HTTP.
+     */
+
+    header(
+        'Content-Type: application/pdf'
+    );
+
+    header(
+        'Content-Disposition: attachment; filename="' .
+        $nombre_archivo .
+        '"'
+    );
+
+    header(
+        'Content-Length: ' .
+        filesize( $ruta_pdf )
+    );
+
+    header(
+        'Cache-Control: private, no-store, no-cache, must-revalidate'
+    );
+
+    header(
+        'Pragma: no-cache'
+    );
+
+    /*
+     * Enviar PDF.
+     */
+
+    readfile(
+        $ruta_pdf
     );
 
     exit;
@@ -545,6 +1043,12 @@ function sinacin_pagina_afiliados() {
 
     $tabla_empresas =
         $wpdb->prefix . 'sinacin_empresas';
+
+    $tabla_faenas =
+        $wpdb->prefix . 'sinacin_faenas';
+
+    $tabla_certificados =
+        $wpdb->prefix . 'sinacin_certificados';
 
 
     /* =====================================================
@@ -664,6 +1168,7 @@ function sinacin_pagina_afiliados() {
                 OR p.rut LIKE %s
                 OR e.nombre_empresa LIKE %s
                 OR e.rut_empresa LIKE %s
+                OR f.nombre_faena LIKE %s
             )
         ";
 
@@ -674,6 +1179,7 @@ function sinacin_pagina_afiliados() {
             ) .
             '%';
 
+        $params[] = $buscar_like;
         $params[] = $buscar_like;
         $params[] = $buscar_like;
         $params[] = $buscar_like;
@@ -694,6 +1200,9 @@ function sinacin_pagina_afiliados() {
 
         INNER JOIN {$tabla_empresas} e
             ON e.id = a.empresa_id
+
+        INNER JOIN {$tabla_faenas} f
+            ON f.id = a.faena_id
 
         {$where}
     ";
@@ -723,9 +1232,11 @@ function sinacin_pagina_afiliados() {
 
     $sql = "
         SELECT
+
             a.id AS afiliacion_id,
             a.persona_id,
             a.empresa_id,
+            a.faena_id,
             a.solicitud_id,
             a.estado,
             a.fecha_afiliacion,
@@ -740,7 +1251,14 @@ function sinacin_pagina_afiliados() {
             p.cargo,
 
             e.nombre_empresa,
-            e.rut_empresa
+            e.rut_empresa,
+
+            f.nombre_faena,
+
+            c.id AS certificado_id,
+            c.numero_certificado,
+            c.archivo_id,
+            c.estado AS estado_certificado
 
         FROM {$tabla_afiliaciones} a
 
@@ -750,10 +1268,16 @@ function sinacin_pagina_afiliados() {
         INNER JOIN {$tabla_empresas} e
             ON e.id = a.empresa_id
 
+        INNER JOIN {$tabla_faenas} f
+            ON f.id = a.faena_id
+
+        LEFT JOIN {$tabla_certificados} c
+            ON c.afiliacion_id = a.id
+
         {$where}
 
         ORDER BY
-            a.fecha_afiliacion DESC
+            a.id DESC
 
         LIMIT %d OFFSET %d
     ";
@@ -790,7 +1314,6 @@ function sinacin_pagina_afiliados() {
             Afiliados
         </h1>
 
-
         <hr class="wp-header-end">
 
 
@@ -809,15 +1332,13 @@ function sinacin_pagina_afiliados() {
                 value="sinacin-afiliados"
             >
 
-
             <input
                 type="search"
                 name="buscar"
                 value="<?php echo esc_attr( $buscar ); ?>"
-                placeholder="Buscar por nombre, RUT o empresa..."
+                placeholder="Buscar por nombre, RUT, empresa o faena..."
                 class="regular-text"
             >
-
 
             <select name="estado">
 
@@ -843,14 +1364,12 @@ function sinacin_pagina_afiliados() {
 
             </select>
 
-
             <button
                 type="submit"
                 class="button button-primary"
             >
                 Buscar
             </button>
-
 
             <a
                 href="<?php echo esc_url(
@@ -908,6 +1427,10 @@ function sinacin_pagina_afiliados() {
                         </th>
 
                         <th>
+                            Faena / Obra
+                        </th>
+
+                        <th>
                             Estado
                         </th>
 
@@ -931,7 +1454,7 @@ function sinacin_pagina_afiliados() {
                         <tr>
 
                             <td
-                                colspan="6"
+                                colspan="7"
                             >
 
                                 No se encontraron afiliados.
@@ -956,6 +1479,7 @@ function sinacin_pagina_afiliados() {
                                     $afiliado->apellido_materno
                                 );
 
+
                             $url_detalle =
                                 add_query_arg(
                                     array(
@@ -969,6 +1493,7 @@ function sinacin_pagina_afiliados() {
                                     )
                                 );
 
+
                             $url_editar =
                                 add_query_arg(
                                     array(
@@ -981,6 +1506,40 @@ function sinacin_pagina_afiliados() {
                                         'admin.php'
                                     )
                                 );
+
+
+                            /*
+                             * URL segura para descargar
+                             * el certificado.
+                             */
+
+                            $url_descargar_certificado = '';
+
+                            if (
+                                ! empty(
+                                    $afiliado->archivo_id
+                                )
+                            ) {
+
+                                $certificado_nonce =
+                                    wp_create_nonce(
+                                        'sinacin_descargar_certificado'
+                                    );
+
+                                $url_descargar_certificado =
+                                    add_query_arg(
+                                        array(
+                                            'sinacin_descargar_certificado' => 1,
+                                            'afiliacion_id' =>
+                                                $afiliado->afiliacion_id,
+                                            'sinacin_certificado_nonce' =>
+                                                $certificado_nonce,
+                                        ),
+                                        admin_url(
+                                            'admin.php'
+                                        )
+                                    );
+                            }
 
                             ?>
 
@@ -1043,6 +1602,17 @@ function sinacin_pagina_afiliados() {
 
                                 <td>
 
+                                    <strong>
+                                        <?php echo esc_html(
+                                            $afiliado->nombre_faena
+                                        ); ?>
+                                    </strong>
+
+                                </td>
+
+
+                                <td>
+
                                     <?php if (
                                         $afiliado->estado === 'ACTIVA'
                                     ) : ?>
@@ -1094,6 +1664,24 @@ function sinacin_pagina_afiliados() {
                                             class="button button-small"
                                         >
                                             Editar
+                                        </a>
+
+                                    <?php endif; ?>
+
+
+                                    <?php if (
+                                        ! empty(
+                                            $afiliado->archivo_id
+                                        )
+                                    ) : ?>
+
+                                        <a
+                                            href="<?php echo esc_url(
+                                                $url_descargar_certificado
+                                            ); ?>"
+                                            class="button button-small"
+                                        >
+                                            Descargar certificado
                                         </a>
 
                                     <?php endif; ?>
@@ -1265,8 +1853,14 @@ function sinacin_mostrar_detalle_afiliado(
     $tabla_empresas =
         $wpdb->prefix . 'sinacin_empresas';
 
+    $tabla_faenas =
+        $wpdb->prefix . 'sinacin_faenas';
+
     $tabla_historial =
         $wpdb->prefix . 'sinacin_historial';
+
+    $tabla_certificados =
+        $wpdb->prefix . 'sinacin_certificados';
 
 
     $afiliado =
@@ -1285,7 +1879,9 @@ function sinacin_mostrar_detalle_afiliado(
                     p.cargo,
 
                     e.nombre_empresa,
-                    e.rut_empresa
+                    e.rut_empresa,
+
+                    f.nombre_faena
 
                 FROM {$tabla_afiliaciones} a
 
@@ -1294,6 +1890,9 @@ function sinacin_mostrar_detalle_afiliado(
 
                 INNER JOIN {$tabla_empresas} e
                     ON e.id = a.empresa_id
+
+                INNER JOIN {$tabla_faenas} f
+                    ON f.id = a.faena_id
 
                 WHERE a.persona_id = %d
 
@@ -1311,6 +1910,7 @@ function sinacin_mostrar_detalle_afiliado(
 
         echo '<div class="wrap">';
         echo '<h1>Afiliado no encontrado</h1>';
+
         echo '<a href="' .
             esc_url(
                 admin_url(
@@ -1318,7 +1918,9 @@ function sinacin_mostrar_detalle_afiliado(
                 )
             ) .
             '" class="button">';
+
         echo 'Volver a afiliados';
+
         echo '</a>';
         echo '</div>';
 
@@ -1377,6 +1979,7 @@ function sinacin_mostrar_detalle_afiliado(
             >
                 &laquo; Volver a afiliados
             </a>
+
 
             <?php if (
                 $afiliado->estado === 'ACTIVA'
@@ -1598,6 +2201,21 @@ function sinacin_mostrar_detalle_afiliado(
                             sinacin_afiliados_formatear_rut(
                                 $afiliado->rut_empresa
                             )
+                        ); ?>
+                    </td>
+
+                </tr>
+
+
+                <tr>
+
+                    <th>
+                        Faena / Obra
+                    </th>
+
+                    <td>
+                        <?php echo esc_html(
+                            $afiliado->nombre_faena
                         ); ?>
                     </td>
 
@@ -1828,6 +2446,19 @@ function sinacin_mostrar_editar_afiliado(
     $tabla_personas =
         $wpdb->prefix . 'sinacin_personas';
 
+    $tabla_afiliaciones =
+        $wpdb->prefix . 'sinacin_afiliaciones';
+
+    $tabla_empresas =
+        $wpdb->prefix . 'sinacin_empresas';
+
+    $tabla_faenas =
+        $wpdb->prefix . 'sinacin_faenas';
+
+
+    /*
+     * Obtener persona.
+     */
 
     $persona =
         $wpdb->get_row(
@@ -1851,6 +2482,93 @@ function sinacin_mostrar_editar_afiliado(
 
         return;
     }
+
+
+    /*
+     * Obtener afiliación activa.
+     */
+
+    $afiliacion =
+        $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT
+                    a.*,
+                    e.nombre_empresa,
+                    e.rut_empresa,
+                    f.nombre_faena
+
+                FROM {$tabla_afiliaciones} a
+
+                INNER JOIN {$tabla_empresas} e
+                    ON e.id = a.empresa_id
+
+                INNER JOIN {$tabla_faenas} f
+                    ON f.id = a.faena_id
+
+                WHERE a.persona_id = %d
+                  AND a.estado = 'ACTIVA'
+
+                ORDER BY
+                    a.id DESC
+
+                LIMIT 1
+                ",
+                $persona_id
+            )
+        );
+
+
+    if ( ! $afiliacion ) {
+
+        echo '<div class="wrap">';
+        echo '<h1>Afiliación no encontrada</h1>';
+
+        echo '<p>';
+        echo 'Este afiliado no tiene una afiliación activa que pueda editarse.';
+        echo '</p>';
+
+        echo '<a href="' .
+            esc_url(
+                admin_url(
+                    'admin.php?page=sinacin-afiliados'
+                )
+            ) .
+            '" class="button">';
+
+        echo '&laquo; Volver a afiliados';
+
+        echo '</a>';
+        echo '</div>';
+
+        return;
+    }
+
+
+    /*
+     * Obtener faenas activas de la empresa.
+     */
+
+    $faenas =
+        $wpdb->get_results(
+            $wpdb->prepare(
+                "
+                SELECT
+                    id,
+                    nombre_faena,
+                    estado
+
+                FROM {$tabla_faenas}
+
+                WHERE empresa_id = %d
+                  AND estado = 'ACTIVA'
+
+                ORDER BY
+                    nombre_faena ASC
+                ",
+                $afiliacion->empresa_id
+            )
+        );
 
 
     ?>
@@ -1913,9 +2631,15 @@ function sinacin_mostrar_editar_afiliado(
 
                 <table class="form-table">
 
+
+                    <!-- ======================================
+                         DATOS PERSONALES
+                         ====================================== -->
+
                     <tr>
 
                         <th>
+
                             <label for="nombres">
                                 Nombres
                             </label>
@@ -1943,9 +2667,11 @@ function sinacin_mostrar_editar_afiliado(
                     <tr>
 
                         <th>
+
                             <label for="apellido_paterno">
                                 Apellido paterno
                             </label>
+
                         </th>
 
                         <td>
@@ -1969,9 +2695,11 @@ function sinacin_mostrar_editar_afiliado(
                     <tr>
 
                         <th>
+
                             <label for="apellido_materno">
                                 Apellido materno
                             </label>
+
                         </th>
 
                         <td>
@@ -2020,9 +2748,11 @@ function sinacin_mostrar_editar_afiliado(
                     <tr>
 
                         <th>
+
                             <label for="celular">
                                 Celular
                             </label>
+
                         </th>
 
                         <td>
@@ -2046,9 +2776,11 @@ function sinacin_mostrar_editar_afiliado(
                     <tr>
 
                         <th>
+
                             <label for="correo">
                                 Correo electrónico
                             </label>
+
                         </th>
 
                         <td>
@@ -2072,9 +2804,11 @@ function sinacin_mostrar_editar_afiliado(
                     <tr>
 
                         <th>
+
                             <label for="cargo">
                                 Cargo
                             </label>
+
                         </th>
 
                         <td>
@@ -2093,6 +2827,119 @@ function sinacin_mostrar_editar_afiliado(
                         </td>
 
                     </tr>
+
+
+                    <!-- ======================================
+                         EMPRESA
+                         ====================================== -->
+
+                    <tr>
+
+                        <th>
+                            Empresa
+                        </th>
+
+                        <td>
+
+                            <strong>
+                                <?php echo esc_html(
+                                    $afiliacion->nombre_empresa
+                                ); ?>
+                            </strong>
+
+                            <br>
+
+                            <span class="sinacin-texto-secundario">
+
+                                RUT:
+                                <?php echo esc_html(
+                                    sinacin_afiliados_formatear_rut(
+                                        $afiliacion->rut_empresa
+                                    )
+                                ); ?>
+
+                            </span>
+
+                            <p class="description">
+                                La empresa no puede modificarse desde esta pantalla.
+                            </p>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- ======================================
+                         FAENA
+                         ====================================== -->
+
+                    <tr>
+
+                        <th>
+
+                            <label for="faena_id">
+                                Faena / Obra
+                            </label>
+
+                        </th>
+
+                        <td>
+
+                            <select
+                                id="faena_id"
+                                name="faena_id"
+                                class="regular-text"
+                                required
+                            >
+
+                                <option value="">
+                                    Seleccionar faena / obra
+                                </option>
+
+
+                                <?php if ( ! empty( $faenas ) ) : ?>
+
+                                    <?php foreach ( $faenas as $faena ) : ?>
+
+                                        <option
+                                            value="<?php echo esc_attr(
+                                                $faena->id
+                                            ); ?>"
+                                            <?php selected(
+                                                $afiliacion->faena_id,
+                                                $faena->id
+                                            ); ?>
+                                        >
+                                            <?php echo esc_html(
+                                                $faena->nombre_faena
+                                            ); ?>
+                                        </option>
+
+                                    <?php endforeach; ?>
+
+                                <?php endif; ?>
+
+                            </select>
+
+
+                            <?php if ( empty( $faenas ) ) : ?>
+
+                                <p class="description sinacin-descripcion-error">
+                                    Esta empresa no tiene faenas activas disponibles.
+                                </p>
+
+                            <?php else : ?>
+
+                                <p class="description">
+                                    Seleccione la faena u obra donde actualmente trabaja el afiliado.
+                                </p>
+
+                            <?php endif; ?>
+
+                        </td>
+
+                    </tr>
+
 
                 </table>
 
@@ -2131,7 +2978,34 @@ function sinacin_mostrar_editar_afiliado(
             margin-top: 20px;
         }
 
+
+        .sinacin-editar-afiliado .sinacin-texto-secundario {
+            color: #646970;
+            font-size: 13px;
+        }
+
+
+        .sinacin-editar-afiliado .sinacin-descripcion-error {
+            color: #b32d2e;
+        }
+
+
+        .sinacin-editar-afiliado select {
+            min-width: 300px;
+        }
+
+
+        @media screen and (max-width: 782px) {
+
+            .sinacin-editar-afiliado select {
+                width: 100%;
+                min-width: 0;
+            }
+
+        }
+
     </style>
 
     <?php
 }
+

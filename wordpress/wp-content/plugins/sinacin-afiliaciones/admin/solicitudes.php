@@ -143,6 +143,10 @@ function sinacin_pagina_solicitudes() {
         $wpdb->prefix .
         'sinacin_empresas';
 
+    $tabla_faenas =
+        $wpdb->prefix .
+        'sinacin_faenas';
+
     $tabla_afiliaciones =
         $wpdb->prefix .
         'sinacin_afiliaciones';
@@ -235,10 +239,11 @@ function sinacin_pagina_solicitudes() {
                             p.apellido_paterno,
                             p.apellido_materno,
                             p.rut,
-                            p.correo,
                             e.rut_empresa,
                             e.nombre_empresa,
-                            e.estado AS estado_empresa
+                            e.estado AS estado_empresa,
+                            f.nombre_faena,
+                            f.estado AS estado_faena
                         FROM {$tabla_solicitudes} s
 
                         INNER JOIN {$tabla_personas} p
@@ -246,6 +251,10 @@ function sinacin_pagina_solicitudes() {
 
                         INNER JOIN {$tabla_empresas} e
                             ON e.id = s.empresa_id
+
+                        INNER JOIN {$tabla_faenas} f
+                            ON f.id = s.faena_id
+                            AND f.empresa_id = s.empresa_id
 
                         WHERE s.id = %d
 
@@ -286,6 +295,18 @@ function sinacin_pagina_solicitudes() {
 
                 $mensaje =
                     'No se puede aprobar una solicitud asociada a una empresa inactiva.';
+
+                $tipo_mensaje =
+                    'error';
+
+            }
+            elseif (
+                $solicitud->estado_faena !==
+                'ACTIVA'
+            ) {
+
+                $mensaje =
+                    'No se puede aprobar una solicitud asociada a una faena u obra inactiva.';
 
                 $tipo_mensaje =
                     'error';
@@ -355,6 +376,9 @@ function sinacin_pagina_solicitudes() {
                                 'empresa_id' =>
                                     $solicitud->empresa_id,
 
+                                'faena_id' =>
+                                    $solicitud->faena_id,
+
                                 'solicitud_id' =>
                                     $solicitud_id,
 
@@ -369,6 +393,7 @@ function sinacin_pagina_solicitudes() {
                             ),
 
                             array(
+                                '%d',
                                 '%d',
                                 '%d',
                                 '%d',
@@ -479,7 +504,7 @@ function sinacin_pagina_solicitudes() {
 
                             $descripcion =
                                 sprintf(
-                                    'Solicitud #%d aprobada. Persona: %s (%s). Empresa: %s (%s). Afiliación #%d creada.',
+                                    'Solicitud #%d aprobada. Persona: %s (%s). Empresa: %s (%s). Faena/Obra: %s. Afiliación #%d creada.',
                                     $solicitud_id,
                                     $nombre_persona,
                                     sinacin_formatear_rut(
@@ -489,6 +514,7 @@ function sinacin_pagina_solicitudes() {
                                     sinacin_formatear_rut(
                                         $solicitud->rut_empresa
                                     ),
+                                    $solicitud->nombre_faena,
                                     $afiliacion_id
                                 );
 
@@ -857,9 +883,9 @@ function sinacin_pagina_solicitudes() {
                             p.apellido_paterno,
                             p.apellido_materno,
                             p.rut,
-                            p.correo,
                             e.rut_empresa,
-                            e.nombre_empresa
+                            e.nombre_empresa,
+                            f.nombre_faena
                         FROM {$tabla_solicitudes} s
 
                         INNER JOIN {$tabla_personas} p
@@ -867,6 +893,10 @@ function sinacin_pagina_solicitudes() {
 
                         INNER JOIN {$tabla_empresas} e
                             ON e.id = s.empresa_id
+
+                        INNER JOIN {$tabla_faenas} f
+                            ON f.id = s.faena_id
+                            AND f.empresa_id = s.empresa_id
 
                         WHERE s.id = %d
 
@@ -973,7 +1003,7 @@ function sinacin_pagina_solicitudes() {
 
                     $descripcion =
                         sprintf(
-                            'Solicitud #%d rechazada. Persona: %s (%s). Empresa: %s (%s). Motivo: %s',
+                            'Solicitud #%d rechazada. Persona: %s (%s). Empresa: %s (%s). Faena/Obra: %s. Motivo: %s',
                             $solicitud_id,
                             $nombre_persona,
                             sinacin_formatear_rut(
@@ -983,6 +1013,7 @@ function sinacin_pagina_solicitudes() {
                             sinacin_formatear_rut(
                                 $solicitud->rut_empresa
                             ),
+                            $solicitud->nombre_faena,
                             $motivo
                         );
 
@@ -1215,9 +1246,14 @@ function sinacin_pagina_solicitudes() {
                 OR e.nombre_empresa LIKE %s
 
                 OR e.rut_empresa LIKE %s
+
+                OR f.nombre_faena LIKE %s
             )
             ";
 
+
+        $parametros[] =
+            $like;
 
         $parametros[] =
             $like;
@@ -1251,6 +1287,10 @@ function sinacin_pagina_solicitudes() {
 
         INNER JOIN {$tabla_empresas} e
             ON e.id = s.empresa_id
+
+        INNER JOIN {$tabla_faenas} f
+            ON f.id = s.faena_id
+            AND f.empresa_id = s.empresa_id
 
         {$where}
         ";
@@ -1295,14 +1335,15 @@ function sinacin_pagina_solicitudes() {
             p.apellido_paterno,
             p.apellido_materno,
             p.rut,
-            p.correo,
             p.celular,
             p.correo,
             p.cargo,
 
             e.rut_empresa,
             e.nombre_empresa,
-            e.estado AS estado_empresa
+            e.estado AS estado_empresa,
+            f.nombre_faena,
+            f.estado AS estado_faena
 
         FROM {$tabla_solicitudes} s
 
@@ -1311,6 +1352,10 @@ function sinacin_pagina_solicitudes() {
 
         INNER JOIN {$tabla_empresas} e
             ON e.id = s.empresa_id
+
+        INNER JOIN {$tabla_faenas} f
+            ON f.id = s.faena_id
+            AND f.empresa_id = s.empresa_id
 
         {$where}
 
@@ -1418,7 +1463,7 @@ function sinacin_pagina_solicitudes() {
                         $buscar
                     );
                 ?>"
-                placeholder="Nombre, RUT o empresa..."
+                placeholder="Nombre, RUT, empresa o faena..."
                 style="min-width:300px;"
             >
 
@@ -1531,6 +1576,10 @@ function sinacin_pagina_solicitudes() {
                     </th>
 
                     <th>
+                        Faena / Obra
+                    </th>
+
+                    <th>
                         Correo
                     </th>
 
@@ -1561,7 +1610,7 @@ function sinacin_pagina_solicitudes() {
 
                     <tr>
 
-                        <td colspan="8">
+                        <td colspan="9">
 
                             No existen solicitudes
                             para los filtros seleccionados.
@@ -1654,6 +1703,26 @@ function sinacin_pagina_solicitudes() {
                                     ?>
 
                                 </small>
+
+                            </td>
+
+
+                            <td>
+
+                                <?php
+                                echo esc_html(
+                                    $solicitud->nombre_faena
+                                );
+                                ?>
+
+                                <?php if (
+                                    $solicitud->estado_faena !== 'ACTIVA'
+                                ) : ?>
+
+                                    <br>
+                                    <small>Faena inactiva</small>
+
+                                <?php endif; ?>
 
                             </td>
 
@@ -1918,6 +1987,10 @@ function sinacin_mostrar_detalle_solicitud(
         $wpdb->prefix .
         'sinacin_empresas';
 
+    $tabla_faenas =
+        $wpdb->prefix .
+        'sinacin_faenas';
+
     $tabla_documentos =
         $wpdb->prefix .
         'sinacin_documentos';
@@ -1939,14 +2012,15 @@ function sinacin_mostrar_detalle_solicitud(
                     p.apellido_paterno,
                     p.apellido_materno,
                     p.rut,
-                    p.correo,
                     p.celular,
                     p.correo,
                     p.cargo,
 
                     e.rut_empresa,
                     e.nombre_empresa,
-                    e.estado AS estado_empresa
+                    e.estado AS estado_empresa,
+                    f.nombre_faena,
+                    f.estado AS estado_faena
 
                 FROM {$tabla_solicitudes} s
 
@@ -1955,6 +2029,10 @@ function sinacin_mostrar_detalle_solicitud(
 
                 INNER JOIN {$tabla_empresas} e
                     ON e.id = s.empresa_id
+
+                INNER JOIN {$tabla_faenas} f
+                    ON f.id = s.faena_id
+                    AND f.empresa_id = s.empresa_id
 
                 WHERE s.id = %d
 
@@ -2330,6 +2408,49 @@ function sinacin_mostrar_detalle_solicitud(
 
                     </td>
 
+                </tr>
+
+            </table>
+
+        </div>
+
+
+        <!-- ======================================
+             FAENA / OBRA
+             ====================================== -->
+
+        <div class="sinacin-detalle-box">
+
+            <h2>
+                Faena / Obra
+            </h2>
+
+            <table class="sinacin-detalle-tabla">
+
+                <tr>
+                    <th>
+                        Faena / Obra
+                    </th>
+                    <td>
+                        <?php
+                        echo esc_html(
+                            $solicitud->nombre_faena
+                        );
+                        ?>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th>
+                        Estado de la faena
+                    </th>
+                    <td>
+                        <?php
+                        echo esc_html(
+                            $solicitud->estado_faena
+                        );
+                        ?>
+                    </td>
                 </tr>
 
             </table>
