@@ -239,6 +239,7 @@ function sinacin_pagina_solicitudes() {
                             p.apellido_paterno,
                             p.apellido_materno,
                             p.rut,
+                            p.correo,
                             e.rut_empresa,
                             e.nombre_empresa,
                             e.estado AS estado_empresa,
@@ -1080,32 +1081,61 @@ function sinacin_pagina_solicitudes() {
 
 
     /**
-     * ==========================================
-     * VISTA DETALLE
-     * ==========================================
-     */
+ * ==========================================
+ * VISTA DETALLE
+ * ==========================================
+ */
 
-    $detalle_id =
-        isset(
+$detalle_id =
+    isset(
+        $_GET['detalle']
+    )
+        ? absint(
             $_GET['detalle']
         )
-            ? absint(
-                $_GET['detalle']
-            )
-            : 0;
+        : 0;
 
 
+if (
+    $detalle_id > 0
+) {
+
+    /**
+     * Mostrar mensaje del procesamiento
+     * antes de cargar el detalle.
+     */
     if (
-        $detalle_id > 0
+        $mensaje !== ''
     ) {
 
-        sinacin_mostrar_detalle_solicitud(
-            $detalle_id
-        );
+        ?>
+        <div class="wrap">
 
-        return;
+            <div
+                class="notice notice-<?php echo esc_attr( $tipo_mensaje ); ?> is-dismissible"
+            >
+                <p>
+                    <?php
+                    echo esc_html(
+                        $mensaje
+                    );
+                    ?>
+                </p>
+            </div>
+
+        </div>
+        <?php
 
     }
+
+
+    sinacin_mostrar_detalle_solicitud(
+        $detalle_id
+    );
+
+    return;
+
+}
 
 
     /**

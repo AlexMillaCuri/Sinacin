@@ -94,6 +94,7 @@ function sinacin_generar_certificado( $afiliacion_id ) {
     $tabla_afiliaciones = $wpdb->prefix . 'sinacin_afiliaciones';
     $tabla_personas     = $wpdb->prefix . 'sinacin_personas';
     $tabla_empresas     = $wpdb->prefix . 'sinacin_empresas';
+    $tabla_faenas       = $wpdb->prefix . 'sinacin_faenas';
     $tabla_certificados = $wpdb->prefix . 'sinacin_certificados';
 
 
@@ -118,7 +119,9 @@ function sinacin_generar_certificado( $afiliacion_id ) {
                 p.cargo,
 
                 e.nombre_empresa,
-                e.rut_empresa
+                e.rut_empresa,
+
+                f.nombre_faena
 
             FROM {$tabla_afiliaciones} a
 
@@ -127,6 +130,9 @@ function sinacin_generar_certificado( $afiliacion_id ) {
 
             INNER JOIN {$tabla_empresas} e
                 ON e.id = a.empresa_id
+
+            LEFT JOIN {$tabla_faenas} f
+                ON f.id = a.faena_id
 
             WHERE a.id = %d
 
@@ -265,19 +271,91 @@ function sinacin_generar_certificado( $afiliacion_id ) {
 
     /**
      * ------------------------------------------
-     * GENERAR NÚMERO DE CERTIFICADO
+     * GENERAR NÚMERO ÚNICO DE CERTIFICADO
      * ------------------------------------------
      *
-     * Ejemplo:
+     * Formato:
      *
-     * SINACIN-2026-000001
+     * SINACIN-2026-1321484
+     *
+     * El número visible no utiliza IDs internos.
      */
 
-    $numero_certificado = sprintf(
-        'SINACIN-%s-%06d',
-        current_time( 'Y' ),
-        $certificado_id
+    $numero_certificado = '';
+
+    $intentos = 0;
+    $max_intentos = 20;
+
+    do {
+
+        $numero_aleatorio = wp_rand(
+            1000000,
+            9999999
+        );
+
+        $numero_candidato = sprintf(
+            'SINACIN-%s-%d',
+            current_time( 'Y' ),
+            $numero_aleatorio
+        );
+
+
+        /**
+         * Verificar que el número no exista.
+         */
+        $numero_existe = $wpdb->get_var(
+            $wpdb->prepare(
+                "
+                SELECT id
+                FROM {$tabla_certificados}
+                WHERE numero_certificado = %s
+                LIMIT 1
+                ",
+                $numero_candidato
+            )
+        );
+
+
+        if ( ! $numero_existe ) {
+
+            $numero_certificado =
+                $numero_candidato;
+
+            break;
+
+        }
+
+
+        $intentos++;
+
+    } while (
+        $intentos < $max_intentos
     );
+
+
+    /**
+     * Si por alguna razón extraordinaria
+     * no logramos obtener un número único,
+     * eliminamos el registro temporal.
+     */
+    if ( empty( $numero_certificado ) ) {
+
+        $wpdb->delete(
+            $tabla_certificados,
+            array(
+                'id' => $certificado_id
+            ),
+            array(
+                '%d'
+            )
+        );
+
+        return array(
+            'success' => false,
+            'message' => 'No fue posible generar un número único de certificado.'
+        );
+
+    }
 
 
     /**
@@ -513,6 +591,10 @@ function sinacin_generar_certificado( $afiliacion_id ) {
         'nombre_empresa'           => $afiliacion->nombre_empresa,
 
         'rut_empresa'              => $rut_empresa,
+
+        'nombre_faena'             => ! empty( $afiliacion->nombre_faena )
+            ? $afiliacion->nombre_faena
+            : 'No registrada',
 
         'fecha_afiliacion'         => $fecha_afiliacion_formateada,
 

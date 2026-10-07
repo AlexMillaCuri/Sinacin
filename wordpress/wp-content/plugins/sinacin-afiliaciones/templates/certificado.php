@@ -1,16 +1,144 @@
 <?php
 /**
  * ==========================================
- * SINACIN - PLANTILLA CERTIFICADO
+ * SINACIN - CERTIFICACIÓN DE AFILIACIÓN SINDICAL
  * ==========================================
  *
- * Esta plantilla es utilizada por Dompdf
- * para generar el certificado de afiliación.
+ * Plantilla utilizada por Dompdf para generar
+ * el certificado de afiliación sindical.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+
+
+/**
+ * ==========================================
+ * FORMATEAR RUT
+ * ==========================================
+ *
+ * Ejemplos:
+ *
+ * 77341890K -> 77.341.890-K
+ * 257616908 -> 25.761.690-8
+ */
+
+$formatear_rut = function ( $rut ) {
+
+    $rut = strtoupper(
+        preg_replace(
+            '/[^0-9Kk]/',
+            '',
+            (string) $rut
+        )
+    );
+
+
+    if ( strlen( $rut ) < 2 ) {
+        return $rut;
+    }
+
+
+    $dv = substr(
+        $rut,
+        -1
+    );
+
+
+    $numero = substr(
+        $rut,
+        0,
+        -1
+    );
+
+
+    $numero = number_format(
+        (int) $numero,
+        0,
+        '',
+        '.'
+    );
+
+
+    return $numero . '-' . $dv;
+
+};
+
+
+$rut_persona_formateado =
+    $formatear_rut(
+        $rut_persona
+    );
+
+
+$rut_empresa_formateado =
+    $formatear_rut(
+        $rut_empresa
+    );
+
+
+/**
+ * ==========================================
+ * FECHA DE EMISIÓN EN TEXTO
+ * ==========================================
+ *
+ * Ejemplo:
+ *
+ * 18 de Septiembre de 2026
+ */
+
+$meses = array(
+
+    1  => 'Enero',
+    2  => 'Febrero',
+    3  => 'Marzo',
+    4  => 'Abril',
+    5  => 'Mayo',
+    6  => 'Junio',
+    7  => 'Julio',
+    8  => 'Agosto',
+    9  => 'Septiembre',
+    10 => 'Octubre',
+    11 => 'Noviembre',
+    12 => 'Diciembre',
+
+);
+
+
+$timestamp_emision =
+    current_time(
+        'timestamp'
+    );
+
+
+$dia_emision =
+    wp_date(
+        'j',
+        $timestamp_emision
+    );
+
+
+$mes_numero =
+    (int) wp_date(
+        'n',
+        $timestamp_emision
+    );
+
+
+$anio_emision =
+    wp_date(
+        'Y',
+        $timestamp_emision
+    );
+
+
+$mes_emision =
+    isset(
+        $meses[ $mes_numero ]
+    )
+        ? $meses[ $mes_numero ]
+        : '';
 
 ?>
 
@@ -24,50 +152,102 @@ if ( ! defined( 'ABSPATH' ) ) {
 
     <style>
 
+        /**
+         * ==========================================
+         * PÁGINA
+         * ==========================================
+         */
+
         @page {
-            size: letter;
+
+            size: 612pt 792pt;
+
             margin: 0;
+
         }
 
 
         * {
+
             box-sizing: border-box;
+
         }
 
 
+        html,
         body {
+
+            width: 612pt;
 
             margin: 0;
 
             padding: 0;
 
-            font-family: DejaVu Sans, sans-serif;
+        }
 
-            color: #333333;
+
+        body {
+
+            font-family:
+                DejaVu Sans,
+                sans-serif;
+
+            font-size: 10.5px;
+
+            line-height: 1.6;
+
+            color: #222222;
 
             background: #ffffff;
-
-            font-size: 12px;
 
         }
 
 
         .pagina {
 
-            width: 100%;
+            width: 502pt;
 
-            min-height: 100%;
+            margin: 0;
 
-            padding: 55px 65px 50px 65px;
+            padding:
+                42pt
+                0
+                35pt
+                0;
 
             position: relative;
 
+            left: 55pt;
+
         }
 
+        .mayusculas {
+            text-transform: uppercase;
+        }
 
-        /* ==========================================
-           ENCABEZADO
-           ========================================== */
+        .marca-agua {
+
+            position: fixed;
+
+            top: 245pt;
+
+            left: 156pt;
+
+            width: 300pt;
+
+            height: auto;
+
+            opacity: 0.06;
+
+            z-index: -1;
+
+        }
+
+        /**
+         * ==========================================
+         * ENCABEZADO
+         * ==========================================
+         */
 
         .encabezado {
 
@@ -75,309 +255,246 @@ if ( ! defined( 'ABSPATH' ) ) {
 
             text-align: center;
 
-            margin-bottom: 35px;
+            margin:
+                0
+                0
+                22px
+                0;
 
         }
 
 
         .logo {
 
-            max-width: 190px;
+            width: 115px;
 
-            max-height: 90px;
+            max-width: 115px;
 
-            margin-bottom: 25px;
+            height: auto;
+
+            margin:
+                0
+                auto
+                12px
+                auto;
 
         }
 
+
+        .nombre-sindicato {
+
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 10px;
+
+            font-weight: bold;
+
+            line-height: 1.45;
+
+            margin:
+                0
+                0
+                5px
+                0;
+
+        }
+
+
+        .sinacin {
+
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 16px;
+
+            font-weight: bold;
+
+            letter-spacing: 1.5px;
+
+            margin:
+                0
+                0
+                4px
+                0;
+
+        }
+
+
+        .datos-sindicato {
+
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 8px;
+
+            line-height: 1.4;
+
+        }
+
+
+        /**
+         * ==========================================
+         * SEPARADOR
+         * ==========================================
+         */
+
+        .separador {
+
+            width: 100%;
+
+            border-top: 1px solid #888888;
+
+            margin:
+                0
+                0
+                25px
+                0;
+
+        }
+
+
+        /**
+         * ==========================================
+         * TÍTULO
+         * ==========================================
+         */
 
         .titulo {
 
-            font-size: 22px;
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 15px;
 
             font-weight: bold;
 
-            letter-spacing: 1px;
-
-            color: #333333;
-
-            margin-bottom: 8px;
-
-        }
-
-
-        .subtitulo {
-
-            font-size: 11px;
-
-            color: #777777;
-
-            letter-spacing: 0.5px;
+            margin:
+                0
+                0
+                28px
+                0;
 
         }
 
 
-        /* ==========================================
-           LÍNEA DECORATIVA
-           ========================================== */
+        /**
+         * ==========================================
+         * CUERPO DEL DOCUMENTO
+         * ==========================================
+         */
 
-        .linea {
+        .contenido {
 
             width: 100%;
 
-            height: 2px;
+            margin: 0;
 
-            background-color: #d4af37;
-
-            margin: 25px 0 35px 0;
+            padding: 0;
 
         }
 
 
-        /* ==========================================
-           CUERPO
-           ========================================== */
+        .parrafo {
 
-        .introduccion {
+            width: 100%;
+
+            margin:
+                0
+                0
+                16px
+                0;
+
+            padding: 0;
 
             text-align: justify;
 
-            line-height: 1.7;
-
-            margin-bottom: 25px;
+            line-height: 1.75;
 
         }
 
 
-        .nombre-afiliado {
-
-            text-align: center;
-
-            font-size: 18px;
+        .dato {
 
             font-weight: bold;
 
-            margin: 25px 0 8px 0;
-
-            text-transform: uppercase;
-
         }
 
 
-        .rut-afiliado {
-
-            text-align: center;
-
-            font-size: 12px;
-
-            color: #555555;
-
-            margin-bottom: 30px;
-
-        }
-
-
-        /* ==========================================
-           TABLA DE DATOS
-           ========================================== */
-
-        .tabla-datos {
-
-            width: 100%;
-
-            border-collapse: collapse;
-
-            margin-top: 15px;
-
-            margin-bottom: 25px;
-
-        }
-
-
-        .tabla-datos td {
-
-            border: 1px solid #dddddd;
-
-            padding: 10px 12px;
-
-            vertical-align: middle;
-
-        }
-
-
-        .tabla-datos .etiqueta {
-
-            width: 32%;
-
-            font-weight: bold;
-
-            background-color: #f7f7f7;
-
-            color: #444444;
-
-        }
-
-
-        .tabla-datos .valor {
-
-            width: 68%;
-
-            color: #333333;
-
-        }
-
-
-        /* ==========================================
-           TEXTO FINAL
-           ========================================== */
-
-        .texto-final {
-
-            text-align: justify;
-
-            line-height: 1.7;
-
-            margin-top: 25px;
-
-        }
-
-
-        /* ==========================================
-           NÚMERO DE CERTIFICADO
-           ========================================== */
-
-        .numero-certificado {
-
-            text-align: center;
-
-            margin-top: 25px;
-
-            font-size: 10px;
-
-            color: #777777;
-
-        }
-
-
-        .numero-certificado strong {
-
-            color: #333333;
-
-        }
-
-
-        /* ==========================================
-           FIRMA
-           ========================================== */
-
-        .firma-container {
-
-            width: 100%;
-
-            margin-top: 65px;
-
-            text-align: center;
-
-        }
-
-
-        .firma-linea {
-
-            width: 220px;
-
-            border-top: 1px solid #555555;
-
-            margin: 0 auto 8px auto;
-
-        }
-
-
-        .firma-titulo {
-
-            font-weight: bold;
-
-            font-size: 11px;
-
-        }
-
-
-        .firma-organizacion {
-
-            font-size: 10px;
-
-            color: #666666;
-
-            margin-top: 3px;
-
-        }
-
-
-        /* ==========================================
-           TIMBRE
-           ========================================== */
+        /**
+         * ==========================================
+         * TIMBRE
+         * ==========================================
+         */
 
         .timbre-container {
 
-            position: absolute;
-
-            right: 65px;
-
-            bottom: 55px;
-
-            width: 120px;
+            width: 100%;
 
             text-align: center;
+
+            margin-top: 38px;
+
+            margin-bottom: 28px;
 
         }
 
 
         .timbre {
 
-            max-width: 115px;
+            width: 270px;
 
-            max-height: 115px;
+            max-width: 270px;
+
+            height: auto;
 
         }
 
 
-        /* ==========================================
-           PIE
-           ========================================== */
+        /**
+         * ==========================================
+         * FECHA
+         * ==========================================
+         */
+
+        .fecha-documento {
+
+            width: 100%;
+
+            margin-top: 15px;
+
+            text-align: left;
+
+            font-size: 10px;
+
+        }
+
+
+        /**
+         * ==========================================
+         * PIE DEL DOCUMENTO
+         * ==========================================
+         */
 
         .pie {
 
-            position: absolute;
+            width: 100%;
 
-            left: 65px;
+            margin-top: 25px;
 
-            right: 65px;
+            padding-top: 8px;
 
-            bottom: 25px;
-
-            text-align: center;
-
-            font-size: 8px;
-
-            color: #999999;
-
-        }
-
-
-        /* ==========================================
-           MODELO
-           ========================================== */
-
-        .modelo-prueba {
+            border-top: 1px solid #dddddd;
 
             text-align: center;
 
-            margin-top: 18px;
+            font-size: 7px;
 
-            font-size: 8px;
-
-            color: #999999;
-
-            letter-spacing: 0.5px;
+            color: #777777;
 
         }
 
@@ -387,6 +504,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 <body>
+
+<?php if ( ! empty( $logo_data ) ) : ?>
+
+    <img
+        src="<?php echo esc_attr( $logo_data ); ?>"
+        class="marca-agua"
+        alt=""
+    >
+
+<?php endif; ?>
 
 
 <div class="pagina">
@@ -399,238 +526,157 @@ if ( ! defined( 'ABSPATH' ) ) {
     <div class="encabezado">
 
 
+        <!-- LOGO SINACIN -->
+
         <?php if ( ! empty( $logo_data ) ) : ?>
 
             <img
                 src="<?php echo esc_attr( $logo_data ); ?>"
                 class="logo"
+                alt="SINACIN"
             >
 
         <?php endif; ?>
 
 
-        <div class="titulo">
+        <!-- NOMBRE DEL SINDICATO -->
 
-            CERTIFICADO DE AFILIACIÓN
+        <div class="nombre-sindicato">
 
-        </div>
-
-
-        <div class="subtitulo">
-
-            SINDICATO NACIONAL DE TRABAJADORES — SINACIN
+            SINDICATO INTEREMPRESA NACIONAL DE LA
+            CONSTRUCCION INDUSTRIAL Y ACTIVIDADES ANEXAS
 
         </div>
 
 
-    </div>
+        <!-- SINACIN -->
 
-
-
-    <!-- ==========================================
-         LÍNEA
-         ========================================== -->
-
-    <div class="linea"></div>
-
-
-
-    <!-- ==========================================
-         INTRODUCCIÓN
-         ========================================== -->
-
-    <div class="introduccion">
-
-        Por medio del presente documento, el Sindicato Nacional de
-        Trabajadores — SINACIN certifica que la persona individualizada
-        a continuación se encuentra registrada como afiliada a esta
-        organización sindical.
-
-    </div>
-
-
-
-    <!-- ==========================================
-         NOMBRE
-         ========================================== -->
-
-    <div class="nombre-afiliado">
-
-        <?php echo esc_html( $nombre_completo ); ?>
-
-    </div>
-
-
-    <div class="rut-afiliado">
-
-        RUT:
-        <?php echo esc_html( $rut_persona ); ?>
-
-    </div>
-
-
-
-    <!-- ==========================================
-         DATOS DEL AFILIADO
-         ========================================== -->
-
-    <table class="tabla-datos">
-
-
-        <tr>
-
-            <td class="etiqueta">
-
-                Cargo
-
-            </td>
-
-            <td class="valor">
-
-                <?php echo esc_html( $cargo ); ?>
-
-            </td>
-
-        </tr>
-
-
-        <tr>
-
-            <td class="etiqueta">
-
-                Empresa
-
-            </td>
-
-            <td class="valor">
-
-                <?php echo esc_html( $nombre_empresa ); ?>
-
-            </td>
-
-        </tr>
-
-
-        <tr>
-
-            <td class="etiqueta">
-
-                RUT Empresa
-
-            </td>
-
-            <td class="valor">
-
-                <?php echo esc_html( $rut_empresa ); ?>
-
-            </td>
-
-        </tr>
-
-
-        <tr>
-
-            <td class="etiqueta">
-
-                Fecha de afiliación
-
-            </td>
-
-            <td class="valor">
-
-                <?php
-
-                echo ! empty( $fecha_afiliacion )
-
-                    ? esc_html( $fecha_afiliacion )
-
-                    : 'No registrada';
-
-                ?>
-
-            </td>
-
-        </tr>
-
-
-        <tr>
-
-            <td class="etiqueta">
-
-                Fecha de emisión
-
-            </td>
-
-            <td class="valor">
-
-                <?php echo esc_html( $fecha_emision ); ?>
-
-            </td>
-
-        </tr>
-
-
-    </table>
-
-
-
-    <!-- ==========================================
-         TEXTO FINAL
-         ========================================== -->
-
-    <div class="texto-final">
-
-        Se extiende el presente certificado a solicitud del interesado,
-        para los fines que estime convenientes.
-
-    </div>
-
-
-
-    <!-- ==========================================
-         NÚMERO
-         ========================================== -->
-
-    <div class="numero-certificado">
-
-        Número de certificado:
-
-        <strong>
-
-            <?php echo esc_html( $numero_certificado ); ?>
-
-        </strong>
-
-    </div>
-
-
-
-    <!-- ==========================================
-         FIRMA
-         ========================================== -->
-
-    <div class="firma-container">
-
-
-        <div class="firma-linea"></div>
-
-
-        <div class="firma-titulo">
-
-            REPRESENTANTE SINDICAL
-
-        </div>
-
-
-        <div class="firma-organizacion">
+        <div class="sinacin">
 
             SINACIN
 
         </div>
 
 
+        <!-- DATOS INSTITUCIONALES -->
+
+        <div class="datos-sindicato">
+
+            Fundado el 24 de febrero de 2016
+
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+
+            R.S.U.: 13-01-4641
+
+        </div>
+
+
     </div>
 
+
+    <!-- ==========================================
+         SEPARADOR
+         ========================================== -->
+
+    <div class="separador"></div>
+
+
+    <!-- ==========================================
+         TÍTULO
+         ========================================== -->
+
+    <div class="titulo">
+
+        CERTIFICACIÓN DE AFILIACIÓN SINDICAL
+
+    </div>
+
+
+    <!-- ==========================================
+         CONTENIDO
+         ========================================== -->
+
+    <div class="contenido">
+
+
+        <!-- PRIMER PÁRRAFO -->
+
+        <p class="parrafo">
+            Por medio del presente documento se deja constancia de que
+            el/la Sr./Sra.
+
+            <span class="dato mayusculas">
+
+                <?php echo esc_html( $nombre_completo ); ?>
+
+            </span>,
+
+            RUT
+
+            <span class="dato">
+
+                <?php echo esc_html( $rut_persona_formateado ); ?>
+
+            </span>,
+
+            perteneciente a la empresa
+
+            <span class="dato mayusculas">
+
+                <?php echo esc_html( $nombre_empresa ); ?>
+
+            </span>,
+
+            RUT
+
+            <span class="dato">
+
+                <?php echo esc_html( $rut_empresa_formateado ); ?>
+
+            </span>,
+
+            y desempeñándose en la faena/obra
+
+            <span class="dato mayusculas">
+
+                <?php echo esc_html( $nombre_faena ); ?>
+
+            </span>.
+
+            Se encuentra afiliado(a) a la organización sindical
+            SINACIN, manifestando su adherencia a todos los acuerdos
+            colectivos de condiciones de trabajo y remuneraciones
+            suscritos por el Sindicato Interempresa Nacional de la
+            Construcción Industrial, Obras Civiles y Actividades
+            Anexas, en adelante, SINACIN.
+
+        </p>
+
+
+        <!-- SEGUNDO PÁRRAFO -->
+
+        <p class="parrafo">
+
+            Asimismo, reconoce la representación de los delegados
+            sindicales en faena para el cumplimiento de los acuerdos
+            alcanzados y autoriza el descuento de la cuota sindical
+            correspondiente a su categoría.
+
+        </p>
+
+
+        <!-- TERCER PÁRRAFO -->
+
+        <p class="parrafo">
+
+            La presente adherencia tendrá una duración equivalente a
+            la de su contrato de trabajo, o hasta que voluntariamente
+            renuncie a ella mediante un documento legalmente válido.
+
+        </p>
+
+
+    </div>
 
 
     <!-- ==========================================
@@ -644,6 +690,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             <img
                 src="<?php echo esc_attr( $timbre_data ); ?>"
                 class="timbre"
+                alt="Timbre SINACIN"
             >
 
         </div>
@@ -651,17 +698,20 @@ if ( ! defined( 'ABSPATH' ) ) {
     <?php endif; ?>
 
 
-
     <!-- ==========================================
-         MODELO
+         FECHA DEL DOCUMENTO
          ========================================== -->
 
-    <div class="modelo-prueba">
+    <div class="fecha-documento">
 
-        MODELO DE PRUEBA — DOCUMENTO GENERADO AUTOMÁTICAMENTE
+        Santiago,
+        <?php echo esc_html( $dia_emision ); ?>
+        de
+        <?php echo esc_html( $mes_emision ); ?>
+        de
+        <?php echo esc_html( $anio_emision ); ?>
 
     </div>
-
 
 
     <!-- ==========================================
@@ -670,7 +720,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
     <div class="pie">
 
-        Sindicato Nacional de Trabajadores — SINACIN
+        Documento generado electrónicamente por SINACIN
+
+        &nbsp;&nbsp;—&nbsp;&nbsp;
+
+        <?php echo esc_html( $numero_certificado ); ?>
 
     </div>
 
