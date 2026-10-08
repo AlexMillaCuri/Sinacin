@@ -176,39 +176,9 @@ function sinacin_generar_certificado( $afiliacion_id ) {
 
 
     /**
-     * ------------------------------------------
-     * VERIFICAR SI YA EXISTE CERTIFICADO
-     * ------------------------------------------
-     *
-     * Evitamos generar certificados duplicados.
+     * Cada llamada representa una emisión nueva.
+     * No reutilizamos certificados anteriores de esta afiliación.
      */
-
-    $certificado_existente = $wpdb->get_row(
-        $wpdb->prepare(
-            "
-            SELECT *
-            FROM {$tabla_certificados}
-            WHERE afiliacion_id = %d
-            ORDER BY id DESC
-            LIMIT 1
-            ",
-            $afiliacion_id
-        )
-    );
-
-
-    if ( $certificado_existente ) {
-
-        return array(
-            'success'          => true,
-            'existing'         => true,
-            'certificado_id'   => (int) $certificado_existente->id,
-            'numero_certificado' => $certificado_existente->numero_certificado,
-            'archivo_id'       => (int) $certificado_existente->archivo_id,
-            'message'          => 'El certificado ya existe.'
-        );
-
-    }
 
 
     /**
@@ -725,211 +695,57 @@ function sinacin_generar_certificado( $afiliacion_id ) {
 
     /**
      * ==========================================
-     * CREAR DIRECTORIO DE CERTIFICADOS
+     * CREAR PDF TEMPORAL PRIVADO
      * ==========================================
+     * No se guarda en uploads ni en la Biblioteca de Medios.
+     * IMPORTANTE: el código que consume ruta_archivo debe
+     * eliminar el archivo con unlink() al terminar de usarlo.
      */
 
-    $upload_dir = wp_upload_dir();
+    $ruta_base_temporal = wp_tempnam( $numero_certificado . '.pdf' );
 
-    $certificados_dir = trailingslashit(
-        $upload_dir['basedir']
-    ) . 'sinacin-certificados';
-
-
-    if ( ! wp_mkdir_p( $certificados_dir ) ) {
-
-        $wpdb->delete(
-            $tabla_certificados,
-            array(
-                'id' => $certificado_id
-            ),
-            array(
-                '%d'
-            )
-        );
-
+    if ( ! $ruta_base_temporal ) {
+        $wpdb->delete( $tabla_certificados, array( 'id' => $certificado_id ), array( '%d' ) );
         return array(
             'success' => false,
-            'message' => 'No fue posible crear el directorio de certificados.'
+            'message' => 'No fue posible crear el archivo temporal del certificado.'
         );
-
     }
 
+    // Conservamos la extensión PDF para los adjuntos de correo.
+    $ruta_archivo = $ruta_base_temporal . '.pdf';
 
-    /**
-     * ==========================================
-     * NOMBRE DEL ARCHIVO
-     * ==========================================
-     */
-
-    $nombre_archivo = sanitize_file_name(
-        $numero_certificado . '.pdf'
-    );
-
-
-    $ruta_archivo = trailingslashit(
-        $certificados_dir
-    ) . $nombre_archivo;
-
-
-    /**
-     * ==========================================
-     * GUARDAR PDF
-     * ==========================================
-     */
-
-    $guardado = file_put_contents(
-        $ruta_archivo,
-        $pdf_content
-    );
-
-
-    if ( false === $guardado ) {
-
-        $wpdb->delete(
-            $tabla_certificados,
-            array(
-                'id' => $certificado_id
-            ),
-            array(
-                '%d'
-            )
-        );
-
+    if ( ! rename( $ruta_base_temporal, $ruta_archivo ) ) {
+        @unlink( $ruta_base_temporal );
+        $wpdb->delete( $tabla_certificados, array( 'id' => $certificado_id ), array( '%d' ) );
         return array(
             'success' => false,
-            'message' => 'No fue posible guardar el archivo PDF.'
+            'message' => 'No fue posible preparar el PDF temporal.'
         );
-
     }
 
+    $guardado = file_put_contents( $ruta_archivo, $pdf_content, LOCK_EX );
 
-    /**
-     * ==========================================
-     * REGISTRAR PDF EN WORDPRESS
-     * ==========================================
-     *
-     * Para esta primera versión registraremos
-     * el archivo en la Biblioteca de Medios.
-     */
-
-    require_once ABSPATH . 'wp-admin/includes/file.php';
-
-    require_once ABSPATH . 'wp-admin/includes/media.php';
-
-    require_once ABSPATH . 'wp-admin/includes/image.php';
-
-
-    $archivo_url = trailingslashit(
-        $upload_dir['baseurl']
-    ) . 'sinacin-certificados/' . $nombre_archivo;
-
-
-    $attachment = array(
-
-        'post_mime_type' => 'application/pdf',
-
-        'post_title' => $numero_certificado,
-
-        'post_content' => '',
-
-        'post_status' => 'inherit'
-
-    );
-
-
-    $archivo_id = wp_insert_attachment(
-        $attachment,
-        $ruta_archivo
-    );
-
-
-    /**
-     * ------------------------------------------
-     * SI FALLA EL REGISTRO EN WORDPRESS
-     * ------------------------------------------
-     */
-
-    if ( is_wp_error( $archivo_id ) ) {
-
-        error_log(
-            'SINACIN - No se pudo registrar el PDF en la Biblioteca de Medios: ' .
-            $archivo_id->get_error_message()
+    if ( false === $guardado || $guardado !== strlen( $pdf_content ) ) {
+        @unlink( $ruta_archivo );
+        $wpdb->delete( $tabla_certificados, array( 'id' => $certificado_id ), array( '%d' ) );
+        return array(
+            'success' => false,
+            'message' => 'No fue posible escribir el PDF temporal.'
         );
-
-        $archivo_id = 0;
-
     }
 
-
     /**
-     * ==========================================
-     * ACTUALIZAR CERTIFICADO
-     * ==========================================
+     * El registro de emisión queda en la base de datos.
+     * archivo_id permanece NULL (no hay attachment permanente).
      */
-
-    $actualizado_certificado = $wpdb->update(
-
-        $tabla_certificados,
-
-        array(
-            'archivo_id' => $archivo_id
-        ),
-
-        array(
-            'id' => $certificado_id
-        ),
-
-        array(
-            '%d'
-        ),
-
-        array(
-            '%d'
-        )
-
-    );
-
-
-    if ( false === $actualizado_certificado ) {
-
-        /**
-         * El PDF ya fue creado, por lo que no
-         * eliminamos automáticamente el archivo.
-         */
-
-        error_log(
-            'SINACIN - No se pudo actualizar archivo_id del certificado ' .
-            $certificado_id
-        );
-
-    }
-
-
-    /**
-     * ==========================================
-     * RESULTADO
-     * ==========================================
-     */
-
     return array(
-
-        'success' => true,
-
-        'existing' => false,
-
-        'certificado_id' => $certificado_id,
-
+        'success'            => true,
+        'existing'           => false,
+        'certificado_id'     => $certificado_id,
         'numero_certificado' => $numero_certificado,
-
-        'archivo_id' => (int) $archivo_id,
-
-        'archivo_url' => $archivo_url,
-
-        'ruta_archivo' => $ruta_archivo,
-
-        'message' => 'Certificado generado correctamente.'
-
+        'archivo_id'         => 0,
+        'ruta_archivo'      => $ruta_archivo,
+        'message'           => 'Certificado generado temporalmente.'
     );
-
 }

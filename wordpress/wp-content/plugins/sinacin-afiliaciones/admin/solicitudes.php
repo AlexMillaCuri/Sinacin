@@ -632,69 +632,35 @@ function sinacin_pagina_solicitudes() {
                 : '';
 
 
-        $archivo_id =
-            isset(
-                $resultado_certificado['archivo_id']
-            )
-                ? absint(
-                    $resultado_certificado['archivo_id']
-                )
-                : 0;
-
-
         /**
-         * ==========================================
-         * OBTENER RUTA DEL PDF
-         * ==========================================
-         *
-         * El certificado recién generado puede
-         * entregar directamente la ruta.
-         *
-         * Si no la entrega, intentamos obtenerla
-         * desde el attachment de WordPress.
+         * El generador devuelve un PDF temporal.
+         * No se utiliza la Biblioteca de Medios.
          */
+        $ruta_pdf = isset( $resultado_certificado['ruta_archivo'] )
+            ? $resultado_certificado['ruta_archivo']
+            : '';
 
-        $ruta_pdf = '';
+        $resultado_correo = array( 'success' => false );
 
-
-        if (
-            isset(
-                $resultado_certificado['ruta_archivo']
-            ) &&
-            ! empty(
-                $resultado_certificado['ruta_archivo']
-            )
-        ) {
-
-            $ruta_pdf =
-                $resultado_certificado['ruta_archivo'];
-
-        }
-        elseif (
-            $archivo_id > 0
-        ) {
-
-            $ruta_pdf =
-                get_attached_file(
-                    $archivo_id
+        if ( is_string( $ruta_pdf ) && $ruta_pdf !== '' && is_file( $ruta_pdf ) && is_readable( $ruta_pdf ) ) {
+            try {
+                $resultado_correo = sinacin_enviar_certificado_por_correo(
+                    $solicitud->correo,
+                    $nombre_persona,
+                    $ruta_pdf,
+                    $numero_certificado
                 );
-
+            } catch ( Throwable $e ) {
+                error_log( 'SINACIN - Error al enviar certificado: ' . $e->getMessage() );
+            } finally {
+                // El PDF es temporal: se elimina tras intentar enviarlo.
+                if ( is_file( $ruta_pdf ) && ! unlink( $ruta_pdf ) ) {
+                    error_log( 'SINACIN - No se pudo eliminar el PDF temporal del certificado ' . $numero_certificado );
+                }
+            }
+        } else {
+            error_log( 'SINACIN - No se encontró el PDF temporal del certificado ' . $numero_certificado );
         }
-
-
-        /**
-         * ==========================================
-         * ENVIAR CERTIFICADO POR CORREO
-         * ==========================================
-         */
-
-        $resultado_correo =
-            sinacin_enviar_certificado_por_correo(
-                $solicitud->correo,
-                $nombre_persona,
-                $ruta_pdf,
-                $numero_certificado
-            );
 
 
         /**

@@ -714,264 +714,91 @@ add_action(
 );
 
 function sinacin_descargar_certificado() {
-
-    if (
-        ! isset( $_GET['sinacin_descargar_certificado'] )
-    ) {
+    if ( ! isset( $_GET['sinacin_descargar_certificado'] ) ) {
         return;
     }
 
-    /*
-     * Verificar permisos.
-     */
-
-    if (
-        ! current_user_can( 'manage_options' )
-    ) {
-        wp_die(
-            'No tienes permisos para descargar este certificado.'
-        );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'No tienes permisos para descargar este certificado.' );
     }
 
-    /*
-     * Verificar nonce.
-     */
+    $nonce = isset( $_GET['sinacin_certificado_nonce'] )
+        ? sanitize_text_field( wp_unslash( $_GET['sinacin_certificado_nonce'] ) )
+        : '';
 
-    if (
-        ! isset( $_GET['sinacin_certificado_nonce'] )
-        ||
-        ! wp_verify_nonce(
-            $_GET['sinacin_certificado_nonce'],
-            'sinacin_descargar_certificado'
-        )
-    ) {
-        wp_die(
-            'La solicitud de seguridad no es válida.'
-        );
+    if ( ! wp_verify_nonce( $nonce, 'sinacin_descargar_certificado' ) ) {
+        wp_die( 'La solicitud de seguridad no es válida.' );
     }
 
-    /*
-     * Obtener ID de afiliación.
-     */
-
-    $afiliacion_id =
-        isset( $_GET['afiliacion_id'] )
-            ? absint(
-                $_GET['afiliacion_id']
-            )
-            : 0;
+    $afiliacion_id = isset( $_GET['afiliacion_id'] )
+        ? absint( $_GET['afiliacion_id'] )
+        : 0;
 
     if ( ! $afiliacion_id ) {
-        wp_die(
-            'Afiliación no válida.'
-        );
+        wp_die( 'Afiliación no válida.' );
     }
+
+    // Cada solicitud de descarga emite un certificado nuevo.
+    $resultado = sinacin_generar_certificado( $afiliacion_id );
+
+    if ( ! is_array( $resultado ) || empty( $resultado['success'] ) ) {
+        $mensaje = is_array( $resultado ) && ! empty( $resultado['message'] )
+            ? $resultado['message']
+            : 'No fue posible generar el certificado.';
+        wp_die( esc_html( $mensaje ) );
+    }
+
+    $ruta_pdf = isset( $resultado['ruta_archivo'] )
+        ? $resultado['ruta_archivo']
+        : '';
+
+    if ( ! is_string( $ruta_pdf ) || ! is_file( $ruta_pdf ) || ! is_readable( $ruta_pdf ) ) {
+        wp_die( 'No fue posible acceder al PDF temporal del certificado.' );
+    }
+
+    $numero = $resultado['numero_certificado'];
+    $certificado_id = absint( $resultado['certificado_id'] );
 
     global $wpdb;
-
-    $tabla_certificados =
-        $wpdb->prefix . 'sinacin_certificados';
-
-    $tabla_afiliaciones =
-        $wpdb->prefix . 'sinacin_afiliaciones';
-
-    /*
-     * Buscar certificado asociado
-     * a la afiliación.
-     */
-
-    $certificado =
-        $wpdb->get_row(
-            $wpdb->prepare(
-                "
-                SELECT
-                    c.id,
-                    c.afiliacion_id,
-                    c.numero_certificado,
-                    c.archivo_id,
-                    c.estado,
-
-                    a.estado AS estado_afiliacion
-
-                FROM {$tabla_certificados} c
-
-                INNER JOIN {$tabla_afiliaciones} a
-                    ON a.id = c.afiliacion_id
-
-                WHERE c.afiliacion_id = %d
-
-                ORDER BY
-                    c.id DESC
-
-                LIMIT 1
-                ",
-                $afiliacion_id
-            )
-        );
-
-    /*
-     * Verificar que exista.
-     */
-
-    if ( ! $certificado ) {
-
-        wp_die(
-            'No existe un certificado asociado a esta afiliación.'
-        );
-    }
-
-    /*
-     * Verificar que tenga archivo.
-     */
-
-    if ( empty( $certificado->archivo_id ) ) {
-
-        wp_die(
-            'El certificado existe, pero no tiene un archivo PDF asociado.'
-        );
-    }
-
-    /*
-     * Obtener ruta física del archivo.
-     */
-
-    $ruta_pdf =
-        get_attached_file(
-            absint(
-                $certificado->archivo_id
-            )
-        );
-
-    if (
-        empty( $ruta_pdf )
-        ||
-        ! file_exists( $ruta_pdf )
-    ) {
-
-        wp_die(
-            'No fue posible encontrar el archivo PDF del certificado.'
-        );
-    }
-
-    /*
-     * Verificar que realmente sea PDF.
-     */
-
-    $tipo_mime =
-        get_post_mime_type(
-            absint(
-                $certificado->archivo_id
-            )
-        );
-
-    if (
-        $tipo_mime !== 'application/pdf'
-    ) {
-
-        wp_die(
-            'El archivo asociado al certificado no es un PDF válido.'
-        );
-    }
-
-    /*
-     * Registrar descarga en historial.
-     */
-
-    $tabla_historial =
-        $wpdb->prefix . 'sinacin_historial';
-
     $wpdb->insert(
-        $tabla_historial,
+        $wpdb->prefix . 'sinacin_historial',
         array(
             'usuario_id'  => get_current_user_id(),
             'entidad'     => 'CERTIFICADO',
-            'entidad_id'  => $certificado->id,
+            'entidad_id'  => $certificado_id,
             'accion'      => 'DESCARGAR_CERTIFICADO',
-            'descripcion' =>
-                'Descarga del certificado ' .
-                $certificado->numero_certificado .
-                '.',
-            'ip' =>
-                isset( $_SERVER['REMOTE_ADDR'] )
-                    ? sanitize_text_field(
-                        wp_unslash(
-                            $_SERVER['REMOTE_ADDR']
-                        )
-                    )
-                    : null,
-            'fecha' =>
-                current_time( 'mysql' ),
+            'descripcion' => 'Emisión y descarga del certificado ' . $numero . '.',
+            'ip'          => isset( $_SERVER['REMOTE_ADDR'] )
+                ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+                : null,
+            'fecha'       => current_time( 'mysql' ),
         ),
-        array(
-            '%d',
-            '%s',
-            '%d',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-        )
+        array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' )
     );
 
-    /*
-     * Limpiar buffers antes de enviar
-     * el archivo.
-     */
+    $nombre_archivo = sanitize_file_name( $numero . '.pdf' );
+    $tamano = filesize( $ruta_pdf );
+    if ( false === $tamano || headers_sent() ) {
+        @unlink( $ruta_pdf );
+        wp_die( 'No fue posible iniciar la descarga del certificado.' );
+    }
 
-    while (
-        ob_get_level()
-    ) {
+    while ( ob_get_level() ) {
         ob_end_clean();
     }
 
-    /*
-     * Nombre final del archivo.
-     */
+    header( 'Content-Type: application/pdf' );
+    header( 'Content-Disposition: attachment; filename="' . $nombre_archivo . '"' );
+    header( 'Content-Length: ' . $tamano );
+    header( 'Cache-Control: private, no-store, no-cache, must-revalidate' );
+    header( 'Pragma: no-cache' );
+    header( 'X-Content-Type-Options: nosniff' );
 
-    $nombre_archivo =
-        sanitize_file_name(
-            $certificado->numero_certificado .
-            '.pdf'
-        );
-
-    /*
-     * Cabeceras HTTP.
-     */
-
-    header(
-        'Content-Type: application/pdf'
-    );
-
-    header(
-        'Content-Disposition: attachment; filename="' .
-        $nombre_archivo .
-        '"'
-    );
-
-    header(
-        'Content-Length: ' .
-        filesize( $ruta_pdf )
-    );
-
-    header(
-        'Cache-Control: private, no-store, no-cache, must-revalidate'
-    );
-
-    header(
-        'Pragma: no-cache'
-    );
-
-    /*
-     * Enviar PDF.
-     */
-
-    readfile(
-        $ruta_pdf
-    );
-
+    // Enviar el PDF y borrar el temporal, sin tocar el registro en BD.
+    readfile( $ruta_pdf );
+    @unlink( $ruta_pdf );
     exit;
 }
-
 
 /* =========================================================
  * PÁGINA PRINCIPAL
@@ -1272,7 +1099,11 @@ function sinacin_pagina_afiliados() {
             ON f.id = a.faena_id
 
         LEFT JOIN {$tabla_certificados} c
-            ON c.afiliacion_id = a.id
+            ON c.id = (
+                SELECT MAX(c2.id)
+                FROM {$tabla_certificados} c2
+                WHERE c2.afiliacion_id = a.id
+            )
 
         {$where}
 
@@ -1515,11 +1346,7 @@ function sinacin_pagina_afiliados() {
 
                             $url_descargar_certificado = '';
 
-                            if (
-                                ! empty(
-                                    $afiliado->archivo_id
-                                )
-                            ) {
+                            if ( $afiliado->estado === 'ACTIVA' ) {
 
                                 $certificado_nonce =
                                     wp_create_nonce(
@@ -1669,11 +1496,7 @@ function sinacin_pagina_afiliados() {
                                     <?php endif; ?>
 
 
-                                    <?php if (
-                                        ! empty(
-                                            $afiliado->archivo_id
-                                        )
-                                    ) : ?>
+                                    <?php if ( $afiliado->estado === 'ACTIVA' ) : ?>
 
                                         <a
                                             href="<?php echo esc_url(
