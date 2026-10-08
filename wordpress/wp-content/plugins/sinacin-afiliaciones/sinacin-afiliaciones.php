@@ -19,6 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ==========================================
  */
 
+require_once plugin_dir_path( __FILE__ ) . 'includes/roles.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/database.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/certificados.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/correo.php';
@@ -50,5 +51,6 @@ register_activation_hook(
 function sinacin_activar_plugin() {
 
     sinacin_crear_tablas();
+    sinacin_registrar_roles();
 
 }

@@ -20,15 +20,39 @@ add_action(
 function sinacin_registrar_menu_empresas() {
 
     add_menu_page(
-        'Empresas SINACIN',
         'SINACIN',
-        'manage_options',
+        'SINACIN',
+        'sinacin_gestionar_afiliaciones',
         'sinacin',
-        'sinacin_pagina_empresas',
+        'sinacin_pagina_inicio',
         'dashicons-building',
         25
     );
 
+    // Empresas permanece disponible exclusivamente para administradores.
+    add_submenu_page(
+        'sinacin',
+        'Empresas',
+        'Empresas',
+        'sinacin_gestionar_afiliaciones',
+        'sinacin-empresas',
+        'sinacin_pagina_empresas'
+    );
+
+}
+
+
+/** Página inicial del menú SINACIN. */
+function sinacin_pagina_inicio() {
+    if ( current_user_can( 'manage_options' ) ) {
+        sinacin_pagina_empresas();
+        return;
+    }
+    if ( current_user_can( 'sinacin_gestionar_afiliaciones' ) ) {
+        sinacin_pagina_solicitudes();
+        return;
+    }
+    wp_die( 'No tienes permisos para acceder a SINACIN.' );
 }
 
 
@@ -387,7 +411,7 @@ function sinacin_pagina_empresas() {
 
     if (
         ! current_user_can(
-            'manage_options'
+            'sinacin_gestionar_afiliaciones'
         )
     ) {
 
@@ -1592,7 +1616,7 @@ function sinacin_pagina_empresas() {
                         href="<?php
                             echo esc_url(
                                 admin_url(
-                                    'admin.php?page=sinacin'
+                                    'admin.php?page=sinacin-empresas'
                                 )
                             );
                         ?>"
@@ -1880,7 +1904,7 @@ function sinacin_pagina_empresas() {
                                 <?php if ( $faena_editar ) : ?>
 
                                     <a
-                                        href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin', 'empresa_faenas' => $empresa_faenas_id ), admin_url( 'admin.php' ) ) ); ?>"
+                                        href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin-empresas', 'empresa_faenas' => $empresa_faenas_id ), admin_url( 'admin.php' ) ) ); ?>"
                                         class="button"
                                     >
                                         Cancelar edición
@@ -1959,7 +1983,7 @@ function sinacin_pagina_empresas() {
                                             <td>
 
                                                 <a
-                                                    href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin', 'empresa_faenas' => $empresa_faenas_id, 'editar_faena' => $faena->id ), admin_url( 'admin.php' ) ) ); ?>"
+                                                    href="<?php echo esc_url( add_query_arg( array( 'page' => 'sinacin-empresas', 'empresa_faenas' => $empresa_faenas_id, 'editar_faena' => $faena->id ), admin_url( 'admin.php' ) ) ); ?>"
                                                     class="button button-small"
                                                 >
                                                     Editar
@@ -1969,7 +1993,7 @@ function sinacin_pagina_empresas() {
                                                 $url_estado_faena = wp_nonce_url(
                                                     add_query_arg(
                                                         array(
-                                                            'page'           => 'sinacin',
+                                                            'page'           => 'sinacin-empresas',
                                                             'empresa_faenas' => $empresa_faenas_id,
                                                             'accion'         => 'cambiar_estado_faena',
                                                             'id'             => $faena->id,
@@ -2170,7 +2194,7 @@ function sinacin_pagina_empresas() {
                     href="<?php
                         echo esc_url(
                             admin_url(
-                                'admin.php?page=sinacin'
+                                'admin.php?page=sinacin-empresas'
                             )
                         );
                     ?>"
@@ -2319,7 +2343,7 @@ function sinacin_pagina_empresas() {
 
                                 $url_faenas = add_query_arg(
                                     array(
-                                        'page'           => 'sinacin',
+                                        'page'           => 'sinacin-empresas',
                                         'empresa_faenas' => $empresa->id,
                                     ),
                                     admin_url( 'admin.php' )

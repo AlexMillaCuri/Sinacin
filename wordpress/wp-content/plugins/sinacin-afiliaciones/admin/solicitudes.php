@@ -24,7 +24,7 @@ function sinacin_registrar_menu_solicitudes() {
         'sinacin',
         'Solicitudes',
         'Solicitudes',
-        'manage_options',
+        'sinacin_gestionar_afiliaciones',
         'sinacin-solicitudes',
         'sinacin_pagina_solicitudes'
     );
@@ -119,7 +119,7 @@ function sinacin_pagina_solicitudes() {
 
     if (
         ! current_user_can(
-            'manage_options'
+            'sinacin_gestionar_afiliaciones'
         )
     ) {
 

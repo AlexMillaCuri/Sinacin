@@ -23,7 +23,7 @@ function sinacin_menu_afiliados() {
         'sinacin',
         'Afiliados',
         'Afiliados',
-        'manage_options',
+        'sinacin_gestionar_afiliaciones',
         'sinacin-afiliados',
         'sinacin_pagina_afiliados'
     );
@@ -116,7 +116,7 @@ function sinacin_procesar_desafiliacion() {
     }
 
     if (
-        ! current_user_can( 'manage_options' )
+        ! current_user_can( 'sinacin_gestionar_afiliaciones' )
     ) {
         wp_die(
             'No tienes permisos para realizar esta acción.'
@@ -271,7 +271,7 @@ function sinacin_procesar_edicion_afiliado() {
     }
 
     if (
-        ! current_user_can( 'manage_options' )
+        ! current_user_can( 'sinacin_gestionar_afiliaciones' )
     ) {
         wp_die(
             'No tienes permisos para realizar esta acción.'
@@ -718,7 +718,7 @@ function sinacin_descargar_certificado() {
         return;
     }
 
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'sinacin_gestionar_afiliaciones' ) ) {
         wp_die( 'No tienes permisos para descargar este certificado.' );
     }
 
@@ -807,7 +807,7 @@ function sinacin_descargar_certificado() {
 function sinacin_pagina_afiliados() {
 
     if (
-        ! current_user_can( 'manage_options' )
+        ! current_user_can( 'sinacin_gestionar_afiliaciones' )
     ) {
         wp_die(
             'No tienes permisos para acceder a esta página.'
