@@ -175,32 +175,6 @@ function sinacin_ajax_validar_empresa() {
 
     /**
      * ------------------------------------------
-     * OBTENER FAENAS ACTIVAS DE LA EMPRESA
-     * ------------------------------------------
-     */
-
-    $tabla_faenas =
-        $wpdb->prefix . 'sinacin_faenas';
-
-    $faenas = $wpdb->get_results(
-        $wpdb->prepare(
-            "
-            SELECT
-                id,
-                nombre_faena
-            FROM {$tabla_faenas}
-            WHERE empresa_id = %d
-            AND estado = 'ACTIVA'
-            ORDER BY nombre_faena ASC
-            ",
-            (int) $empresa->id
-        ),
-        ARRAY_A
-    );
-
-
-    /**
-     * ------------------------------------------
      * EMPRESA VÁLIDA
      * ------------------------------------------
      */
@@ -209,14 +183,6 @@ function sinacin_ajax_validar_empresa() {
         array(
             'message' =>
                 'RUT de empresa validado correctamente.',
-
-            'empresa_id' =>
-                (int) $empresa->id,
-
-            'faenas' =>
-                is_array( $faenas )
-                    ? $faenas
-                    : array(),
         )
     );
 
@@ -230,1232 +196,218 @@ function sinacin_ajax_validar_empresa() {
  */
 
 function sinacin_mostrar_formulario() {
-
+    $base_imagenes = plugins_url( '../assets/images/', __FILE__ );
     ob_start();
-
     ?>
-
     <div class="sinacin-formulario-container">
-
-        <form
-            id="sinacin-formulario-afiliacion"
-            method="post"
-            enctype="multipart/form-data"
-            novalidate
-        >
-
-            <?php
-
-            wp_nonce_field(
-                'sinacin_enviar_solicitud',
-                'sinacin_nonce'
-            );
-
-            ?>
-
-
-            <!-- ==========================================
-                 RUT EMPRESA
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="rut_empresa">
-                    RUT de empresa *
-                </label>
-
-                <input
-                    type="text"
-                    id="rut_empresa"
-                    name="rut_empresa"
-                    placeholder="Ej: 76.123.456-7"
-                    maxlength="12"
-                    required
-                    autocomplete="off"
-                >
-
-                <small id="sinacin-empresa-mensaje"></small>
-
-            </div>
-
-
-            <!-- ==========================================
-                 FAENA / OBRA
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="faena_id">
-                    Faena / Obra *
-                </label>
-
-                <select
-                    id="faena_id"
-                    name="faena_id"
-                    required
-                    disabled
-                >
-                    <option value="">
-                        Selecciona una faena / obra
-                    </option>
-                </select>
-
-                <small id="sinacin-faena-mensaje"></small>
-
-            </div>
-
-
-            <!-- ==========================================
-                 NOMBRES
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="nombres">
-                    Nombres *
-                </label>
-
-                <input
-                    type="text"
-                    id="nombres"
-                    name="nombres"
-                    maxlength="100"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 APELLIDO PATERNO
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="apellido_paterno">
-                    Apellido paterno *
-                </label>
-
-                <input
-                    type="text"
-                    id="apellido_paterno"
-                    name="apellido_paterno"
-                    maxlength="100"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 APELLIDO MATERNO
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="apellido_materno">
-                    Apellido materno *
-                </label>
-
-                <input
-                    type="text"
-                    id="apellido_materno"
-                    name="apellido_materno"
-                    maxlength="100"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 RUT PERSONA
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="rut">
-                    RUT *
-                </label>
-
-                <input
-                    type="text"
-                    id="rut"
-                    name="rut"
-                    placeholder="Ej: 12.345.678-5"
-                    maxlength="12"
-                    required
-                    disabled
-                    autocomplete="off"
-                >
-
-                <small id="sinacin-rut-mensaje"></small>
-
-            </div>
-
-
-            <!-- ==========================================
-                 CELULAR
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="celular">
-                    Celular *
-                </label>
-
-                <input
-                    type="tel"
-                    id="celular"
-                    name="celular"
-                    maxlength="30"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 CORREO
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="correo">
-                    Correo electrónico *
-                </label>
-
-                <input
-                    type="email"
-                    id="correo"
-                    name="correo"
-                    maxlength="190"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 CARGO
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="cargo">
-                    Cargo *
-                </label>
-
-                <input
-                    type="text"
-                    id="cargo"
-                    name="cargo"
-                    maxlength="150"
-                    required
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- ==========================================
-                 CÉDULA
-                 ========================================== -->
-
-            <div class="sinacin-campo">
-
-                <label for="cedula">
-                    Fotografía de cédula de identidad *
-                </label>
-
-                <input
-                    type="file"
-                    id="cedula"
-                    name="cedula"
-                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                    required
-                    disabled
-                >
-
-                <small>
-                    Formatos permitidos: JPG, JPEG, PNG o WEBP.
-                    Tamaño máximo: 5 MB.
-                </small>
-
-            </div>
-
-
-            <!-- ==========================================
-                 DECLARACIÓN LEGAL
-                 ========================================== -->
-
-            <div class="sinacin-declaracion">
-
-                <label
-                    class="sinacin-checkbox-label"
-                    for="acepta_terminos"
-                >
-
-                    <input
-                        type="checkbox"
-                        id="acepta_terminos"
-                        name="acepta_terminos"
-                        value="1"
-                        required
-                        disabled
-                    >
-
-                    <span>
-
-                        En conformidad con el Código del Trabajo, declaro libre y
-                        voluntariamente mi decisión de afiliarme al Sindicato
-                        Interempresa Nacional de la Construcción Industrial y
-                        Actividades Anexas - SINACIN.
-
-                        <br><br>
-
-                        Autorizo expresamente a mi empleador para descontar de mis
-                        remuneraciones la cuota sindical ordinaria y aquellas
-                        extraordinarias aprobadas conforme a la ley y a los estatutos
-                        sindicales, debiendo enterarse dichos montos al sindicato.
-
-                    </span>
-
-                </label>
-
-            </div>
-
-
-            <!-- ==========================================
-                 BOTÓN
-                 ========================================== -->
-
-            <div class="sinacin-boton-container">
-
-                <button
-                    type="submit"
-                    id="sinacin-boton-enviar"
-                    disabled
-                >
-                    Enviar solicitud de afiliación
-                </button>
-
-            </div>
-
-
-            <!-- ==========================================
-                 MENSAJE
-                 ========================================== -->
-
-            <div
-                id="sinacin-mensaje-general"
-                role="alert"
-                aria-live="polite"
-            ></div>
-
-        </form>
-
+      <form id="sinacin-formulario-afiliacion" method="post" enctype="multipart/form-data" novalidate>
+        <header class="sinacin-formulario-header">
+          <img class="sinacin-logo" src="<?php echo esc_url( $base_imagenes . 'logo_sinacin.png' ); ?>" alt="Logo de SINACIN">
+          <h2>Solicitud de afiliación a sindicato SINACIN</h2>
+          <p>Completa tus datos para enviar tu solicitud de afiliación.</p>
+        </header>
+        <?php wp_nonce_field( 'sinacin_enviar_solicitud', 'sinacin_nonce' ); ?>
+        <section class="sinacin-seccion" aria-labelledby="sinacin-titulo-empresa">
+          <h3 id="sinacin-titulo-empresa">Empresa y lugar de trabajo</h3>
+          <p class="sinacin-ayuda-seccion">Primero valida el RUT de tu empresa para continuar.</p>
+          <div class="sinacin-campo">
+            <label for="rut_empresa">RUT de empresa <span aria-hidden="true">*</span></label>
+            <input type="text" id="rut_empresa" name="rut_empresa" placeholder="Ej.: 76.123.456-7" maxlength="12" required autocomplete="off" inputmode="text">
+            <small id="sinacin-empresa-mensaje" aria-live="polite"></small>
+          </div>
+          <div class="sinacin-campo">
+            <label for="faena_id">Faena u obra donde trabajas <span aria-hidden="true">*</span></label>
+            <select id="faena_id" name="faena_id" required disabled><option value="">Primero valida el RUT de la empresa</option></select>
+            <small id="sinacin-faena-mensaje">Selecciona la faena u obra donde trabajas.</small>
+          </div>
+        </section>
+        <section class="sinacin-seccion" aria-labelledby="sinacin-titulo-datos">
+          <h3 id="sinacin-titulo-datos">Datos personales</h3>
+          <div class="sinacin-campo"><label for="nombres">Nombre(s) <span aria-hidden="true">*</span></label><input type="text" id="nombres" name="nombres" maxlength="100" autocomplete="given-name" required disabled placeholder="Ingresa tus nombres"></div>
+          <div class="sinacin-grid">
+            <div class="sinacin-campo"><label for="apellido_paterno">Apellido paterno <span aria-hidden="true">*</span></label><input type="text" id="apellido_paterno" name="apellido_paterno" maxlength="100" autocomplete="family-name" required disabled placeholder="Apellido paterno"></div>
+            <div class="sinacin-campo"><label for="apellido_materno">Apellido materno <span aria-hidden="true">*</span></label><input type="text" id="apellido_materno" name="apellido_materno" maxlength="100" required disabled placeholder="Apellido materno"></div>
+            <div class="sinacin-campo"><label for="rut">RUT <span aria-hidden="true">*</span></label><input type="text" id="rut" name="rut" maxlength="12" required disabled placeholder="12.345.678-9" autocomplete="off"><small id="sinacin-rut-mensaje" aria-live="polite"></small></div>
+            <div class="sinacin-campo"><label for="celular_digitos">Celular <span aria-hidden="true">*</span></label><div class="sinacin-telefono"><span aria-hidden="true">+56 9</span><input type="tel" id="celular_digitos" name="celular_digitos" inputmode="numeric" autocomplete="tel-national" placeholder="1234 5678" maxlength="8" minlength="8" pattern="[0-9]{8}" required disabled aria-label="Ocho dígitos del celular"></div><input type="hidden" id="celular" name="celular" value=""></div>
+          </div>
+          <div class="sinacin-campo"><label for="correo">Correo electrónico <span aria-hidden="true">*</span></label><input type="email" id="correo" name="correo" maxlength="190" autocomplete="email" placeholder="ejemplo@correo.cl" required disabled></div>
+          <div class="sinacin-campo"><label for="cargo">Cargo actual <span aria-hidden="true">*</span></label><input type="text" id="cargo" name="cargo" maxlength="150" placeholder="Ej.: Soldador, operador, maestro" required disabled></div>
+        </section>
+        <section class="sinacin-seccion" aria-labelledby="sinacin-titulo-cedula">
+          <h3 id="sinacin-titulo-cedula">Documento de identidad</h3>
+          <div class="sinacin-campo"><label for="cedula">Fotografía de cédula de identidad <span aria-hidden="true">*</span> <em>Solo lado frontal</em></label>
+            <div class="sinacin-documento-grid"><div class="sinacin-subida"><input type="file" id="cedula" name="cedula" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required disabled><small>JPG, JPEG, PNG o WEBP. Máximo 5 MB. Debe verse completa y legible.</small><div id="sinacin-vista-previa" hidden><img id="sinacin-imagen-previa" alt="Vista previa de la fotografía seleccionada"></div></div><figure class="sinacin-ejemplo"><img src="<?php echo esc_url( $base_imagenes . 'ejemplo_carnet_frontal.png' ); ?>" alt="Ejemplo de fotografía del lado frontal de la cédula de identidad" loading="lazy"><figcaption>Ejemplo: lado frontal</figcaption></figure></div>
+          </div>
+        </section>
+        <section class="sinacin-seccion" aria-labelledby="sinacin-titulo-declaraciones">
+          <h3 id="sinacin-titulo-declaraciones">Declaraciones y autorizaciones</h3>
+          <div class="sinacin-declaraciones">
+            <label class="sinacin-checkbox-label" for="acepta_terminos"><input type="checkbox" id="acepta_terminos" name="acepta_terminos" value="1" required disabled><span>En conformidad con el Código del Trabajo, declaro libre y voluntariamente mi decisión de afiliarme al Sindicato Interempresa Nacional de la Construcción Industrial y Actividades Anexas - SINACIN.</span></label>
+            <label class="sinacin-checkbox-label" for="autoriza_descuento"><input type="checkbox" id="autoriza_descuento" name="autoriza_descuento" value="1" required disabled><span>Autorizo expresamente a mi empleador para descontar de mis remuneraciones la cuota sindical ordinaria y aquellas extraordinarias aprobadas conforme a la ley y a los estatutos sindicales, debiendo enterarse dichos montos al sindicato.</span></label>
+            <label class="sinacin-checkbox-label" for="reconoce_delegados"><input type="checkbox" id="reconoce_delegados" name="reconoce_delegados" value="1" required disabled><span>Reconozco la representación de los delegados en faena y el cumplimiento de los acuerdos alcanzados.</span></label>
+          </div>
+        </section>
+        <div class="sinacin-privacidad">Tus antecedentes serán utilizados para gestionar tu solicitud de afiliación. Verifica que tus datos sean correctos antes de enviarlos.</div>
+        <button type="submit" id="sinacin-boton-enviar" disabled>Enviar solicitud de afiliación</button>
+        <div id="sinacin-mensaje-general" role="status" aria-live="polite" hidden></div>
+      </form>
+      <div id="sinacin-confirmacion-final" class="sinacin-confirmacion-final" role="status" aria-live="polite" hidden>
+        <span class="sinacin-confirmacion-icono" aria-hidden="true">✓</span>
+        <h2>¡Solicitud enviada con éxito!</h2>
+        <p>Tu solicitud de afiliación fue recibida correctamente y quedó pendiente de revisión por SINACIN.</p>
+        <p class="sinacin-confirmacion-nota">Gracias por completar el formulario.</p>
+      </div>
     </div>
-
-
     <style>
-
-        .sinacin-formulario-container {
-            max-width: 700px;
-            margin: 30px auto;
-        }
-
-        .sinacin-campo {
-            margin-bottom: 20px;
-        }
-
-        .sinacin-campo label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: 600;
-        }
-
-        .sinacin-campo input[type="text"],
-        .sinacin-campo input[type="email"],
-        .sinacin-campo input[type="tel"],
-        .sinacin-campo input[type="file"],
-        .sinacin-campo select {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 11px 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-
-        .sinacin-campo input:disabled,
-        .sinacin-campo select:disabled {
-            background: #f4f4f4;
-            cursor: not-allowed;
-        }
-
-        .sinacin-campo small {
-            display: block;
-            margin-top: 6px;
-            font-size: 13px;
-        }
-
-        #sinacin-empresa-mensaje,
-        #sinacin-rut-mensaje {
-            min-height: 18px;
-        }
-
-        .sinacin-declaracion {
-            margin: 25px 0;
-            padding: 18px;
-            background: #fafafa;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-
-        .sinacin-checkbox-label {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            cursor: pointer;
-            line-height: 1.5;
-        }
-
-        .sinacin-checkbox-label input {
-            margin-top: 5px;
-            flex-shrink: 0;
-        }
-
-        .sinacin-boton-container {
-            margin-top: 25px;
-        }
-
-        #sinacin-boton-enviar {
-            padding: 12px 22px;
-            border: 0;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        #sinacin-boton-enviar:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        #sinacin-mensaje-general {
-            margin-top: 20px;
-            font-weight: 600;
-        }
-
+      .sinacin-formulario-container{--sinacin-rojo:#922e38;--sinacin-borde:#e9dadd;--sinacin-texto:#30343b;max-width:820px;margin:36px auto;padding:0 16px;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--sinacin-texto);box-sizing:border-box}
+      .sinacin-formulario-container *{box-sizing:border-box}
+      .sinacin-formulario-container [hidden]{display:none!important}
+      #sinacin-empresa-mensaje[data-estado="cargando"]{display:flex;align-items:center;gap:9px;color:#762832}
+      #sinacin-empresa-mensaje[data-estado="cargando"]::before{content:"";display:inline-block;width:15px;height:15px;flex:0 0 15px;border:2px solid #e9dadd;border-top-color:#922e38;border-radius:50%;animation:sinacin-giro .7s linear infinite}
+      #sinacin-empresa-mensaje[data-estado="exito"]{color:#28623c}
+      #sinacin-empresa-mensaje[data-estado="error"]{color:#922e38}
+      @keyframes sinacin-giro{to{transform:rotate(360deg)}}
+      .sinacin-confirmacion-final:not([hidden]){display:flex;flex-direction:column;align-items:center;text-align:center;background:#fff;border:1px solid #e9dadd;border-radius:20px;padding:54px 30px;box-shadow:0 15px 45px rgba(54,24,31,.07)}
+      .sinacin-confirmacion-icono{display:flex;align-items:center;justify-content:center;width:68px;height:68px;background:#eef8f0;color:#27623c;border-radius:50%;font-size:38px;font-weight:700;margin-bottom:20px}
+      .sinacin-confirmacion-final h2{font-size:25px;color:#762832;margin:0 0 14px}
+      .sinacin-confirmacion-final p{font-size:15px;line-height:1.65;color:#49434a;margin:0 0 12px;max-width:530px}
+      .sinacin-confirmacion-final .sinacin-confirmacion-nota{font-size:13px;color:#756e74}
+      .sinacin-formulario-container form{background:#fff;border:1px solid var(--sinacin-borde);border-radius:20px;padding:36px 42px;box-shadow:0 15px 45px rgba(54,24,31,.07)}
+      .sinacin-formulario-header{text-align:center;border-bottom:1px solid #eee6e8;padding-bottom:28px;margin-bottom:26px}
+      .sinacin-formulario-container .sinacin-logo{display:block;max-width:180px;max-height:110px;width:auto;height:auto;object-fit:contain;margin:0 auto 18px}
+      .sinacin-formulario-header h2{font-size:clamp(22px,3vw,29px);line-height:1.25;color:#762832;font-weight:750;margin:0}
+      .sinacin-formulario-header p{font-size:15px;color:#68616a;line-height:1.5;margin:12px 0 0}
+      .sinacin-seccion{padding:10px 0 22px;margin-bottom:16px;border-bottom:1px solid #f0e8ea}
+      .sinacin-seccion h3{font-size:17px;font-weight:700;color:#652630;margin:0 0 17px}
+      .sinacin-ayuda-seccion{font-size:13px;color:#6c6267;margin:-8px 0 16px}
+      .sinacin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+      .sinacin-campo{margin-bottom:18px;min-width:0}
+      .sinacin-campo label{display:block;font-size:13.5px;font-weight:650;margin:0 0 8px;color:#3b3034}
+      .sinacin-campo label span{color:var(--sinacin-rojo)}
+      .sinacin-campo label em{font-style:normal;color:#8d3e49;font-weight:500;font-size:12px;margin-left:5px}
+      .sinacin-campo input:not([type="checkbox"]):not([type="hidden"]),.sinacin-campo select{width:100%;min-height:46px;border:1px solid #dcd1d4;border-radius:10px;background:#fff;padding:10px 13px;font-size:15px;color:#282328;box-shadow:none}
+      .sinacin-campo input:focus,.sinacin-campo select:focus{outline:2px solid rgba(146,46,56,.17);border-color:var(--sinacin-rojo)}
+      .sinacin-campo input:disabled,.sinacin-campo select:disabled{background:#f6f4f5;color:#898187;cursor:not-allowed}
+      .sinacin-campo small{display:block;font-size:12px;color:#726b70;margin-top:6px;line-height:1.5}
+      .sinacin-telefono{display:flex;align-items:center;border:1px solid #dcd1d4;border-radius:10px;overflow:hidden;background:#fff}
+      .sinacin-telefono>span{flex-shrink:0;padding:0 12px;background:#f8f1f2;color:#6c2c36;font-weight:700;font-size:14px;align-self:stretch;display:flex;align-items:center;border-right:1px solid #e8dadd}
+      .sinacin-formulario-container .sinacin-telefono input{border:0!important;border-radius:0!important;min-width:0}
+      .sinacin-documento-grid{display:grid;grid-template-columns:1fr 210px;gap:18px;align-items:start}
+      .sinacin-subida{min-width:0}.sinacin-subida input[type="file"]{font-size:12px;padding:9px;max-width:100%}
+      .sinacin-ejemplo{margin:0;border:1px solid var(--sinacin-borde);border-radius:12px;background:#fbf8f9;padding:10px;text-align:center}
+      .sinacin-ejemplo img{display:block;width:100%;height:auto;max-height:140px;object-fit:contain;border-radius:6px}
+      .sinacin-ejemplo figcaption{font-size:11px;color:#76696d;margin-top:6px}
+      #sinacin-vista-previa{margin-top:12px}#sinacin-imagen-previa{max-width:100%;max-height:150px;border-radius:8px;border:1px solid #e8dadd}
+      .sinacin-declaraciones{background:#fcf8f9;border:1px solid #eee1e4;border-radius:12px;padding:8px 18px}
+      .sinacin-checkbox-label{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;line-height:1.6;padding:15px 0;color:#4b4246;cursor:pointer}
+      .sinacin-checkbox-label+.sinacin-checkbox-label{border-top:1px solid #ede1e4}
+      .sinacin-checkbox-label input{flex-shrink:0;width:18px;height:18px;margin:3px 0 0;accent-color:var(--sinacin-rojo)}
+      .sinacin-privacidad{background:#f9f7f8;border-radius:9px;padding:13px 15px;color:#655d62;font-size:12.5px;line-height:1.5;margin:16px 0 22px}
+      #sinacin-boton-enviar{display:block;width:100%;border:0;border-radius:11px;background:var(--sinacin-rojo);color:#fff;font-size:15px;font-weight:750;padding:16px;cursor:pointer;transition:background .2s}
+      #sinacin-boton-enviar:hover:not(:disabled){background:#76232d}#sinacin-boton-enviar:disabled{opacity:.48;cursor:not-allowed}
+      #sinacin-mensaje-general:not([hidden]){margin-top:17px;border-radius:10px;padding:14px;font-size:14px;line-height:1.5;background:#f9f0f2;color:#6f2631}
+      #sinacin-mensaje-general[data-tipo="exito"]{background:#eef8f0;color:#225b36}
+      @media(max-width:650px){.sinacin-formulario-container{padding:0 9px;margin:20px auto}.sinacin-formulario-container form{padding:24px 18px;border-radius:15px}.sinacin-grid,.sinacin-documento-grid{grid-template-columns:1fr}.sinacin-ejemplo{max-width:280px}.sinacin-formulario-header h2{font-size:22px}}
     </style>
-
-
     <script>
-
-    document.addEventListener(
-        'DOMContentLoaded',
-        function() {
-
-            const formulario =
-                document.getElementById(
-                    'sinacin-formulario-afiliacion'
-                );
-
-
-            const rutEmpresa =
-                document.getElementById(
-                    'rut_empresa'
-                );
-
-
-            const rutPersona =
-                document.getElementById(
-                    'rut'
-                );
-
-
-            const mensajeEmpresa =
-                document.getElementById(
-                    'sinacin-empresa-mensaje'
-                );
-
-
-            const mensajeRut =
-                document.getElementById(
-                    'sinacin-rut-mensaje'
-                );
-
-
-            const faenaSelect =
-                document.getElementById(
-                    'faena_id'
-                );
-
-
-            const mensajeFaena =
-                document.getElementById(
-                    'sinacin-faena-mensaje'
-                );
-
-
-            const botonEnviar =
-                document.getElementById(
-                    'sinacin-boton-enviar'
-                );
-
-
-            const mensajeGeneral =
-                document.getElementById(
-                    'sinacin-mensaje-general'
-                );
-
-
-            const camposBloqueables =
-                formulario.querySelectorAll(
-                    'input:not(#rut_empresa), select:not(#rut_empresa)'
-                );
-
-
-            let empresaValida = false;
-
-            let rutPersonaValido = false;
-
-
-            /**
-             * ==========================================
-             * NORMALIZAR RUT
-             * ==========================================
-             */
-
-            function normalizarRut(rut) {
-
-                return rut
-                    .replace(/\./g, '')
-                    .replace(/-/g, '')
-                    .replace(/\s/g, '')
-                    .toUpperCase();
-
+    (function(){
+      function iniciar(){
+        const f=document.getElementById('sinacin-formulario-afiliacion');if(!f||f.dataset.sinacinIniciado)return;f.dataset.sinacinIniciado='1';
+        const empresa=f.querySelector('#rut_empresa'),rut=f.querySelector('#rut'),faena=f.querySelector('#faena_id'),msgEmpresa=f.querySelector('#sinacin-empresa-mensaje'),msgRut=f.querySelector('#sinacin-rut-mensaje'),msgFaena=f.querySelector('#sinacin-faena-mensaje'),boton=f.querySelector('#sinacin-boton-enviar'),general=f.querySelector('#sinacin-mensaje-general'),celular=f.querySelector('#celular'),digitos=f.querySelector('#celular_digitos'),cedula=f.querySelector('#cedula'),vista=f.querySelector('#sinacin-vista-previa'),imgVista=f.querySelector('#sinacin-imagen-previa'),confirmacion=document.getElementById('sinacin-confirmacion-final');
+        const ajaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,nonceEmpresa=<?php echo wp_json_encode( wp_create_nonce( 'sinacin_validar_empresa' ) ); ?>;
+        let empresaValida=false,rutValido=false,enviando=false,secuencia=0,temporizador=null,previewUrl=null;
+        const bloqueados=Array.from(f.querySelectorAll('input:not(#rut_empresa):not([type="hidden"]),select'));
+        function normalizar(v){return v.replace(/[.\-\s]/g,'').toUpperCase()}
+        function validar(v){v=normalizar(v);if(!/^\d{1,8}[\dK]$/.test(v))return false;let suma=0,m=2;for(let i=v.length-2;i>=0;i--){suma+=Number(v[i])*m;m=m===7?2:m+1}const r=11-suma%11;return v.slice(-1)===(r===11?'0':r===10?'K':String(r))}
+        function formato(v){v=normalizar(v);if(v.length<2)return v;return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+v.slice(-1)}
+        function mensaje(texto,tipo){general.hidden=!texto;general.textContent=texto||'';general.dataset.tipo=tipo||'error'}
+        function estadoEmpresa(texto,estado){msgEmpresa.textContent=texto||'';msgEmpresa.dataset.estado=estado||''}
+        function actualizar(){boton.disabled=enviando||!empresaValida||!rutValido||!f.checkValidity()}
+        function bloquear(){bloqueados.forEach(e=>e.disabled=true);faena.innerHTML='<option value="">Primero valida el RUT de la empresa</option>';msgFaena.textContent='Selecciona la faena u obra donde trabajas.';rutValido=false;msgRut.textContent='';actualizar()}
+        function habilitar(){bloqueados.forEach(e=>e.disabled=false);faena.disabled=true;actualizar()}
+        function telefono(){digitos.value=digitos.value.replace(/\D/g,'').slice(0,8);celular.value=digitos.value.length===8?'+56 9'+digitos.value:''}
+        async function cargarFaenas(){faena.disabled=true;faena.innerHTML='<option value="">Cargando faenas...</option>';msgFaena.textContent='';const n=secuencia;const datos=new URLSearchParams({action:'sinacin_obtener_faenas_formulario',nonce:nonceEmpresa,rut_empresa:empresa.value});try{const r=await fetch(ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:datos});const j=await r.json();if(n!==secuencia||!empresaValida)return;faena.innerHTML='<option value="">Selecciona una faena u obra</option>';if(!j.success||!Array.isArray(j.data.faenas)||!j.data.faenas.length){msgFaena.textContent=j.data?.message||'No hay faenas activas disponibles.';faena.disabled=true;actualizar();return}j.data.faenas.forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.nombre;faena.appendChild(o)});faena.disabled=false;msgFaena.textContent='Selecciona la faena donde trabajas.';actualizar()}catch(e){if(n!==secuencia)return;faena.innerHTML='<option value="">No se pudieron cargar las faenas</option>';msgFaena.textContent='Inténtalo nuevamente modificando el RUT de empresa.';actualizar()}}
+        empresa.addEventListener('input',()=>{
+          secuencia++;clearTimeout(temporizador);empresaValida=false;bloquear();estadoEmpresa('','');
+          const valor=empresa.value.trim();
+          if(!valor)return;
+          if(!validar(valor)){estadoEmpresa('Ingresa un RUT de empresa válido.','error');return}
+          empresa.value=formato(valor);
+          const n=secuencia;
+          estadoEmpresa('Verificando empresa...','cargando');
+          temporizador=setTimeout(async()=>{
+            const datos=new URLSearchParams({action:'sinacin_validar_empresa',nonce:nonceEmpresa,rut_empresa:empresa.value});
+            try{
+              const r=await fetch(ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:datos});
+              if(!r.ok)throw new Error('Error de conexión');
+              const j=await r.json();
+              if(n!==secuencia)return;
+              if(j.success){empresaValida=true;habilitar();estadoEmpresa('Empresa validada correctamente.','exito');cargarFaenas()}
+              else{estadoEmpresa(j.data?.message||'Empresa no disponible.','error')}
+            }catch(e){if(n===secuencia)estadoEmpresa('No fue posible validar la empresa. Inténtalo nuevamente.','error')}
+          },450);
+        });
+        rut.addEventListener('input',()=>{rutValido=validar(rut.value);msgRut.textContent=rut.value?(rutValido?'RUT válido.':'El RUT ingresado no es válido.'):'';if(rutValido)rut.value=formato(rut.value);actualizar()});
+        digitos.addEventListener('input',()=>{telefono();actualizar()});
+        cedula.addEventListener('change',()=>{if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}vista.hidden=true;const file=cedula.files?.[0];if(!file)return;if(file.size>5*1024*1024){mensaje('La fotografía no puede superar los 5 MB.');cedula.value='';actualizar();return}if(!['image/jpeg','image/png','image/webp'].includes(file.type)){mensaje('Selecciona una imagen JPG, PNG o WEBP.');cedula.value='';actualizar();return}previewUrl=URL.createObjectURL(file);imgVista.src=previewUrl;vista.hidden=false;mensaje('');actualizar()});
+        f.addEventListener('input',actualizar);f.addEventListener('change',actualizar);
+        f.addEventListener('submit',async ev=>{
+          ev.preventDefault();
+          if(enviando||f.hidden)return;
+          mensaje('');telefono();
+          if(!empresaValida||!rutValido||!f.checkValidity()){
+            f.reportValidity();mensaje('Revisa los campos obligatorios, el RUT de empresa y tu RUT.');return;
+          }
+          enviando=true;actualizar();boton.textContent='Enviando solicitud...';
+          const datos=new FormData(f);datos.append('sinacin_enviar_solicitud','1');
+          try{
+            const r=await fetch(window.location.href,{method:'POST',body:datos,headers:{'Accept':'application/json'}});
+            if(!r.ok)throw new Error('Error al enviar');
+            const j=await r.json();
+            if(j.success){
+              if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}
+              f.hidden=true;
+              confirmacion.hidden=false;
+              confirmacion.scrollIntoView({behavior:'smooth',block:'center'});
+              return;
             }
-
-
-            /**
-             * ==========================================
-             * VALIDAR RUT
-             * ==========================================
-             */
-
-            function validarRut(rut) {
-
-                rut =
-                    normalizarRut(rut);
-
-
-                if (
-                    rut.length < 2 ||
-                    rut.length > 9
-                ) {
-
-                    return false;
-
-                }
-
-
-                const cuerpo =
-                    rut.slice(
-                        0,
-                        -1
-                    );
-
-
-                const dv =
-                    rut.slice(-1);
-
-
-                if (
-                    !/^\d+$/.test(
-                        cuerpo
-                    )
-                ) {
-
-                    return false;
-
-                }
-
-
-                let suma = 0;
-
-                let multiplicador = 2;
-
-
-                for (
-                    let i =
-                        cuerpo.length - 1;
-
-                    i >= 0;
-
-                    i--
-                ) {
-
-                    suma +=
-                        parseInt(
-                            cuerpo.charAt(i),
-                            10
-                        ) *
-                        multiplicador;
-
-
-                    multiplicador++;
-
-
-                    if (
-                        multiplicador > 7
-                    ) {
-
-                        multiplicador = 2;
-
-                    }
-
-                }
-
-
-                const resto =
-                    suma % 11;
-
-
-                const resultado =
-                    11 - resto;
-
-
-                let dvCalculado;
-
-
-                if (
-                    resultado === 11
-                ) {
-
-                    dvCalculado = '0';
-
-                }
-                else if (
-                    resultado === 10
-                ) {
-
-                    dvCalculado = 'K';
-
-                }
-                else {
-
-                    dvCalculado =
-                        String(
-                            resultado
-                        );
-
-                }
-
-
-                return (
-                    dv ===
-                    dvCalculado
-                );
-
-            }
-
-
-            /**
-             * ==========================================
-             * FORMATEAR RUT
-             * ==========================================
-             */
-
-            function formatearRut(rut) {
-
-                rut =
-                    normalizarRut(rut);
-
-
-                if (
-                    rut.length < 2
-                ) {
-
-                    return rut;
-
-                }
-
-
-                const cuerpo =
-                    rut.slice(
-                        0,
-                        -1
-                    );
-
-
-                const dv =
-                    rut.slice(-1);
-
-
-                let cuerpoFormateado = '';
-
-                let contador = 0;
-
-
-                for (
-                    let i =
-                        cuerpo.length - 1;
-
-                    i >= 0;
-
-                    i--
-                ) {
-
-                    cuerpoFormateado =
-                        cuerpo.charAt(i) +
-                        cuerpoFormateado;
-
-
-                    contador++;
-
-
-                    if (
-                        contador === 3 &&
-                        i !== 0
-                    ) {
-
-                        cuerpoFormateado =
-                            '.' +
-                            cuerpoFormateado;
-
-                        contador = 0;
-
-                    }
-
-                }
-
-
-                return (
-                    cuerpoFormateado +
-                    '-' +
-                    dv
-                );
-
-            }
-
-
-            /**
-             * ==========================================
-             * HABILITAR CAMPOS
-             * ==========================================
-             */
-
-            function habilitarFormulario() {
-
-                camposBloqueables.forEach(
-                    function(campo) {
-
-                        campo.disabled = false;
-
-                    }
-                );
-
-            }
-
-
-            /**
-             * ==========================================
-             * DESHABILITAR CAMPOS
-             * ==========================================
-             */
-
-            function deshabilitarFormulario() {
-
-                camposBloqueables.forEach(
-                    function(campo) {
-
-                        campo.disabled = true;
-
-                    }
-                );
-
-
-                botonEnviar.disabled = true;
-
-                rutPersonaValido = false;
-
-            }
-
-
-            /**
-             * ==========================================
-             * CARGAR FAENAS
-             * ==========================================
-             */
-
-            function cargarFaenas(faenas) {
-
-                faenaSelect.innerHTML = '';
-
-                faenaSelect.disabled = true;
-
-                mensajeFaena.textContent = '';
-
-                const opcionInicial = document.createElement('option');
-
-                opcionInicial.value = '';
-                opcionInicial.textContent =
-                    'Selecciona una faena / obra';
-
-                faenaSelect.appendChild(opcionInicial);
-
-                if ( ! Array.isArray( faenas ) || faenas.length === 0 ) {
-
-                    mensajeFaena.textContent =
-                        'La empresa no tiene faenas u obras activas registradas.';
-
-                    return;
-
-                }
-
-                faenas.forEach(function(faena) {
-
-                    const opcion = document.createElement('option');
-
-                    opcion.value = faena.id;
-                    opcion.textContent = faena.nombre_faena;
-
-                    faenaSelect.appendChild(opcion);
-
-                });
-
-                faenaSelect.disabled = false;
-
-            }
-
-
-            /**
-             * ==========================================
-             * VALIDAR RUT EMPRESA
-             * ==========================================
-             */
-
-            let temporizadorEmpresa = null;
-
-
-            rutEmpresa.addEventListener(
-                'input',
-                function() {
-
-                    empresaValida = false;
-
-                    deshabilitarFormulario();
-
-                    faenaSelect.innerHTML =
-                        '<option value="">Selecciona una faena / obra</option>';
-                    faenaSelect.disabled = true;
-                    mensajeFaena.textContent = '';
-
-                    mensajeEmpresa.textContent = '';
-
-                    const valor =
-                        rutEmpresa.value.trim();
-
-
-                    if (
-                        !valor
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !validarRut(valor)
-                    ) {
-
-                        mensajeEmpresa.textContent =
-                            'El RUT de empresa no es válido.';
-
-                        return;
-
-                    }
-
-
-                    rutEmpresa.value =
-                        formatearRut(
-                            valor
-                        );
-
-
-                    clearTimeout(
-                        temporizadorEmpresa
-                    );
-
-
-                    temporizadorEmpresa =
-                        setTimeout(
-                            function() {
-
-                                const datos =
-                                    new URLSearchParams();
-
-
-                                datos.append(
-                                    'action',
-                                    'sinacin_validar_empresa'
-                                );
-
-
-                                datos.append(
-                                    'nonce',
-                                    '<?php echo esc_js( wp_create_nonce( 'sinacin_validar_empresa' ) ); ?>'
-                                );
-
-
-                                datos.append(
-                                    'rut_empresa',
-                                    rutEmpresa.value
-                                );
-
-
-                                fetch(
-                                    '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',
-                                    {
-                                        method: 'POST',
-
-                                        headers: {
-                                            'Content-Type':
-                                                'application/x-www-form-urlencoded'
-                                        },
-
-                                        body:
-                                            datos.toString()
-                                    }
-                                )
-                                .then(
-                                    response =>
-                                        response.json()
-                                )
-                                .then(
-                                    function(data) {
-
-                                        if (
-                                            data.success
-                                        ) {
-
-                                            empresaValida = true;
-
-                                            habilitarFormulario();
-
-                                            cargarFaenas(
-                                                data.data.faenas || []
-                                            );
-
-                                            mensajeEmpresa.textContent =
-                                                'RUT de empresa validado correctamente.';
-
-                                        }
-                                        else {
-
-                                            empresaValida = false;
-
-                                            deshabilitarFormulario();
-
-
-                                            mensajeEmpresa.textContent =
-                                                data.data.message ||
-                                                'No es posible continuar con el RUT de empresa ingresado.';
-
-                                        }
-
-                                    }
-                                )
-                                .catch(
-                                    function() {
-
-                                        empresaValida = false;
-
-                                        deshabilitarFormulario();
-
-
-                                        mensajeEmpresa.textContent =
-                                            'No fue posible validar el RUT de empresa. Inténtalo nuevamente.';
-
-                                    }
-                                );
-
-                            },
-                            500
-                        );
-
-                }
-            );
-
-
-            /**
-             * ==========================================
-             * VALIDAR RUT PERSONA
-             * ==========================================
-             */
-
-            rutPersona.addEventListener(
-                'input',
-                function() {
-
-                    rutPersonaValido = false;
-
-
-                    const valor =
-                        rutPersona.value.trim();
-
-
-                    if (
-                        !valor
-                    ) {
-
-                        mensajeRut.textContent = '';
-
-                        actualizarEstadoBoton();
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !validarRut(valor)
-                    ) {
-
-                        mensajeRut.textContent =
-                            'El RUT ingresado no es válido.';
-
-                        actualizarEstadoBoton();
-
-                        return;
-
-                    }
-
-
-                    rutPersona.value =
-                        formatearRut(
-                            valor
-                        );
-
-
-                    rutPersonaValido = true;
-
-
-                    mensajeRut.textContent =
-                        'RUT válido.';
-
-
-                    actualizarEstadoBoton();
-
-                }
-            );
-
-
-            /**
-             * ==========================================
-             * ACTUALIZAR BOTÓN
-             * ==========================================
-             */
-
-            function actualizarEstadoBoton() {
-
-                botonEnviar.disabled =
-                    !(
-                        empresaValida &&
-                        rutPersonaValido &&
-                        formulario.checkValidity()
-                    );
-
-            }
-
-
-            /**
-             * ==========================================
-             * CAMBIOS EN FORMULARIO
-             * ==========================================
-             */
-
-            formulario.addEventListener(
-                'input',
-                function() {
-
-                    actualizarEstadoBoton();
-
-                }
-            );
-
-
-            formulario.addEventListener(
-                'change',
-                function() {
-
-                    actualizarEstadoBoton();
-
-                }
-            );
-
-
-            /**
-             * ==========================================
-             * ENVÍO
-             * ==========================================
-             */
-
-            formulario.addEventListener(
-                'submit',
-                function(event) {
-
-                    event.preventDefault();
-
-
-                    mensajeGeneral.textContent = '';
-
-
-                    if (
-                        !empresaValida
-                    ) {
-
-                        mensajeGeneral.textContent =
-                            'Debes validar primero el RUT de empresa.';
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !rutPersonaValido
-                    ) {
-
-                        mensajeGeneral.textContent =
-                            'Debes ingresar un RUT válido.';
-
-                        rutPersona.focus();
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !formulario.checkValidity()
-                    ) {
-
-                        formulario.reportValidity();
-
-                        return;
-
-                    }
-
-
-                    botonEnviar.disabled = true;
-
-
-                    mensajeGeneral.textContent =
-                        'Enviando solicitud...';
-
-
-                    const formData =
-                        new FormData(
-                            formulario
-                        );
-
-
-                    formData.append(
-                        'sinacin_enviar_solicitud',
-                        '1'
-                    );
-
-
-                    fetch(
-                        window.location.href,
-                        {
-                            method: 'POST',
-
-                            body:
-                                formData
-                        }
-                    )
-                    .then(
-                        response =>
-                            response.json()
-                    )
-                    .then(
-                        function(data) {
-
-                            if (
-                                data.success
-                            ) {
-
-                                mensajeGeneral.textContent =
-                                    data.data.message;
-
-
-                                formulario.reset();
-
-
-                                empresaValida = false;
-
-                                rutPersonaValido = false;
-
-
-                                deshabilitarFormulario();
-
-
-                                mensajeEmpresa.textContent = '';
-
-                                mensajeRut.textContent = '';
-
-                                faenaSelect.innerHTML =
-                                    '<option value="">Selecciona una faena / obra</option>';
-                                faenaSelect.disabled = true;
-                                mensajeFaena.textContent = '';
-
-                            }
-                            else {
-
-                                mensajeGeneral.textContent =
-                                    data.data.message ||
-                                    'No fue posible enviar la solicitud.';
-
-
-                                botonEnviar.disabled = false;
-
-                            }
-
-                        }
-                    )
-                    .catch(
-                        function() {
-
-                            mensajeGeneral.textContent =
-                                'Ocurrió un error al enviar la solicitud. Inténtalo nuevamente.';
-
-
-                            botonEnviar.disabled = false;
-
-                        }
-                    );
-
-                }
-            );
-
-        }
-    );
-
+            mensaje(j.data?.message||'No fue posible enviar la solicitud.');
+          }catch(e){mensaje('Ocurrió un error al enviar la solicitud. Inténtalo nuevamente.')}
+          finally{enviando=false;boton.textContent='Enviar solicitud de afiliación';actualizar()}
+        });
+        bloquear();
+      }
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',iniciar);else iniciar();
+    })();
     </script>
-
     <?php
-
     return ob_get_clean();
+}
 
+/**
+ * Devuelve faenas activas para la empresa validada.
+ */
+add_action( 'wp_ajax_sinacin_obtener_faenas_formulario', 'sinacin_obtener_faenas_formulario' );
+add_action( 'wp_ajax_nopriv_sinacin_obtener_faenas_formulario', 'sinacin_obtener_faenas_formulario' );
+function sinacin_obtener_faenas_formulario() {
+    check_ajax_referer( 'sinacin_validar_empresa', 'nonce' );
+    global $wpdb;
+    $rut = isset( $_POST['rut_empresa'] ) ? sinacin_normalizar_rut_formulario( sanitize_text_field( wp_unslash( $_POST['rut_empresa'] ) ) ) : '';
+    if ( ! sinacin_validar_rut_formulario( $rut ) ) {
+        wp_send_json_error( array( 'message' => 'RUT de empresa inválido.' ) );
+    }
+    $empresas = $wpdb->prefix . 'sinacin_empresas';
+    $faenas = $wpdb->prefix . 'sinacin_faenas';
+    $empresa_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$empresas} WHERE REPLACE(REPLACE(REPLACE(UPPER(rut_empresa), '.', ''), '-', ''), ' ', '') = %s AND estado = 'ACTIVA' LIMIT 1", $rut ) );
+    if ( ! $empresa_id ) {
+        wp_send_json_error( array( 'message' => 'Empresa no disponible.' ) );
+    }
+    $filas = $wpdb->get_results( $wpdb->prepare( "SELECT id, nombre_faena FROM {$faenas} WHERE empresa_id = %d AND estado = 'ACTIVA' ORDER BY nombre_faena ASC", $empresa_id ) );
+    $resultado = array();
+    foreach ( (array) $filas as $fila ) {
+        $resultado[] = array( 'id' => (int) $fila->id, 'nombre' => $fila->nombre_faena );
+    }
+    wp_send_json_success( array( 'faenas' => $resultado ) );
 }
 
 
@@ -1598,11 +550,10 @@ function sinacin_procesar_solicitud() {
             : '';
 
 
-    $faena_id =
-        isset( $_POST['faena_id'] )
-            ? absint( $_POST['faena_id'] )
-            : 0;
+    $faena_id = isset( $_POST['faena_id'] ) ? absint( $_POST['faena_id'] ) : 0;
 
+    $autoriza_descuento = isset( $_POST['autoriza_descuento'] ) ? 1 : 0;
+    $reconoce_delegados = isset( $_POST['reconoce_delegados'] ) ? 1 : 0;
 
     $acepta_terminos =
         isset(
@@ -1653,7 +604,7 @@ function sinacin_procesar_solicitud() {
         ||
         trim( $cargo ) === ''
         ||
-        $faena_id <= 0
+        $faena_id < 1
     ) {
 
         sinacin_respuesta_error(
@@ -1701,6 +652,10 @@ function sinacin_procesar_solicitud() {
     }
 
 
+    if ( ! preg_match( '/^\+56 9[0-9]{8}$/', $celular ) ) {
+        sinacin_respuesta_error( 'Ingresa un celular válido con prefijo +56 9 y ocho dígitos.' );
+    }
+
     /**
      * ------------------------------------------
      * VALIDAR CORREO
@@ -1725,11 +680,11 @@ function sinacin_procesar_solicitud() {
      */
 
     if (
-        $acepta_terminos !== 1
+        $acepta_terminos !== 1 || $autoriza_descuento !== 1 || $reconoce_delegados !== 1
     ) {
 
         sinacin_respuesta_error(
-            'Debes aceptar la declaración para continuar.'
+            'Debes aceptar las tres declaraciones para continuar.'
         );
 
     }
@@ -1869,11 +824,6 @@ function sinacin_procesar_solicitud() {
         'sinacin_afiliaciones';
 
 
-    $tabla_faenas =
-        $wpdb->prefix .
-        'sinacin_faenas';
-
-
     $tabla_documentos =
         $wpdb->prefix .
         'sinacin_documentos';
@@ -1937,36 +887,13 @@ function sinacin_procesar_solicitud() {
     $empresa_id =
         (int) $empresa->id;
 
-
-    /**
-     * ------------------------------------------
-     * VALIDAR FAENA ACTIVA
-     * ------------------------------------------
-     */
-
-    $faena =
-        $wpdb->get_row(
-            $wpdb->prepare(
-                "
-                SELECT id
-                FROM {$tabla_faenas}
-                WHERE id = %d
-                AND empresa_id = %d
-                AND estado = 'ACTIVA'
-                LIMIT 1
-                ",
-                $faena_id,
-                $empresa_id
-            )
-        );
-
-
-    if ( ! $faena ) {
-
-        sinacin_respuesta_error(
-            'La faena u obra seleccionada no es válida para la empresa ingresada.'
-        );
-
+    $tabla_faenas = $wpdb->prefix . 'sinacin_faenas';
+    $faena_valida = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM {$tabla_faenas} WHERE id = %d AND empresa_id = %d AND estado = 'ACTIVA' LIMIT 1",
+        $faena_id, $empresa_id
+    ) );
+    if ( ! $faena_valida ) {
+        sinacin_respuesta_error( 'Debes seleccionar una faena activa de la empresa.' );
     }
 
 
