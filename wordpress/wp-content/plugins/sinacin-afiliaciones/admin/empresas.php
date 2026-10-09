@@ -402,6 +402,36 @@ function sinacin_normalizar_ruts_empresas_existentes() {
 
 
 /**
+ * Reglas de integridad entre empresas, faenas y afiliaciones.
+ * Se comprueban en el servidor para todas las rutas de edición.
+ */
+function sinacin_empresa_tiene_faenas_activas( $empresa_id ) {
+    global $wpdb;
+    $tabla = $wpdb->prefix . 'sinacin_faenas';
+    return (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$tabla} WHERE empresa_id = %d AND estado = 'ACTIVA'",
+        $empresa_id
+    ) );
+}
+
+function sinacin_faena_tiene_afiliados_activos( $faena_id ) {
+    global $wpdb;
+    $tabla = $wpdb->prefix . 'sinacin_afiliaciones';
+    return (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$tabla} WHERE faena_id = %d AND estado = 'ACTIVA'",
+        $faena_id
+    ) );
+}
+
+function sinacin_empresa_esta_activa( $empresa_id ) {
+    global $wpdb;
+    $tabla = $wpdb->prefix . 'sinacin_empresas';
+    return 'ACTIVA' === $wpdb->get_var( $wpdb->prepare(
+        "SELECT estado FROM {$tabla} WHERE id = %d LIMIT 1", $empresa_id
+    ) );
+}
+
+/**
  * ==========================================
  * PÁGINA EMPRESAS
  * ==========================================
@@ -655,7 +685,11 @@ function sinacin_pagina_empresas() {
                 }
 
 
-                if (
+                if ( $id > 0 && $estado === 'INACTIVA' && sinacin_empresa_tiene_faenas_activas( $id ) > 0 ) {
+                    $mensaje = 'No se puede desactivar la empresa: primero debes desactivar todas sus faenas activas.';
+                    $tipo_mensaje = 'error';
+                }
+                elseif (
                     $empresa_existente
                 ) {
 
@@ -902,6 +936,10 @@ function sinacin_pagina_empresas() {
                             : 'ACTIVA';
 
 
+                    if ( $nuevo_estado === 'INACTIVA' && sinacin_empresa_tiene_faenas_activas( $id ) > 0 ) {
+                        $mensaje = 'No se puede desactivar la empresa: primero debes desactivar todas sus faenas activas.';
+                        $tipo_mensaje = 'error';
+                    } else {
                     $resultado =
                         $wpdb->update(
                             $tabla_empresas,
@@ -952,6 +990,7 @@ function sinacin_pagina_empresas() {
                             'error';
 
                     }
+                    } // Fin de validación de faenas activas.
 
                 }
 
@@ -971,6 +1010,10 @@ function sinacin_pagina_empresas() {
     $empresa_faenas_id = isset( $_GET['empresa_faenas'] )
         ? absint( $_GET['empresa_faenas'] )
         : 0;
+
+    // Los avisos de acciones de faenas se muestran dentro de su modal.
+    $mensaje_en_modal_faenas = isset( $_POST['sinacin_guardar_faena'] )
+        || ( isset( $_GET['accion'] ) && sanitize_key( wp_unslash( $_GET['accion'] ) ) === 'cambiar_estado_faena' );
 
     if ( isset( $_POST['sinacin_guardar_faena'] ) ) {
 
@@ -1006,13 +1049,24 @@ function sinacin_pagina_empresas() {
             } else {
                 $empresa_existe = $wpdb->get_var(
                     $wpdb->prepare(
-                        "SELECT id FROM {$tabla_empresas} WHERE id = %d LIMIT 1",
+                        "SELECT estado FROM {$tabla_empresas} WHERE id = %d LIMIT 1",
                         $empresa_id
                     )
                 );
 
                 if ( ! $empresa_existe ) {
                     $mensaje = 'La empresa no existe.';
+                    $tipo_mensaje = 'error';
+                } elseif ( $estado_faena === 'ACTIVA' && $empresa_existe !== 'ACTIVA' ) {
+                    $mensaje = 'No se puede activar una faena si su empresa está inactiva.';
+                    $tipo_mensaje = 'error';
+                } elseif ( $faena_id > 0 && $estado_faena === 'INACTIVA' && sinacin_faena_tiene_afiliados_activos( $faena_id ) > 0 ) {
+                    $mensaje = 'No se puede desactivar la faena: tiene afiliados activos. Debes desafiliarlos o trasladarlos primero.';
+                    $tipo_mensaje = 'error';
+                } elseif ( $faena_id > 0 && (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT empresa_id FROM {$tabla_faenas} WHERE id = %d LIMIT 1", $faena_id
+                ) ) !== $empresa_id ) {
+                    $mensaje = 'La faena no pertenece a la empresa seleccionada.';
                     $tipo_mensaje = 'error';
                 } else {
                     $duplicada = $wpdb->get_var(
@@ -1108,6 +1162,13 @@ function sinacin_pagina_empresas() {
                 $tipo_mensaje = 'error';
             } else {
                 $nuevo_estado = ( $estado_actual === 'ACTIVA' ) ? 'INACTIVA' : 'ACTIVA';
+                if ( $nuevo_estado === 'INACTIVA' && sinacin_faena_tiene_afiliados_activos( $faena_id ) > 0 ) {
+                    $mensaje = 'No se puede desactivar la faena: tiene afiliados activos. Debes desafiliarlos o trasladarlos primero.';
+                    $tipo_mensaje = 'error';
+                } elseif ( $nuevo_estado === 'ACTIVA' && ! sinacin_empresa_esta_activa( $empresa_id ) ) {
+                    $mensaje = 'No se puede activar la faena mientras su empresa esté inactiva.';
+                    $tipo_mensaje = 'error';
+                } else {
                 $resultado = $wpdb->update(
                     $tabla_faenas,
                     array(
@@ -1126,6 +1187,7 @@ function sinacin_pagina_empresas() {
                     $mensaje = 'No fue posible actualizar el estado de la faena.';
                     $tipo_mensaje = 'error';
                 }
+                } // Fin de validaciones del estado de faena.
             }
         }
     }
@@ -1369,7 +1431,7 @@ function sinacin_pagina_empresas() {
         <hr class="wp-header-end">
 
 
-        <?php if ( $mensaje !== '' ) : ?>
+        <?php if ( $mensaje !== '' && ! $mensaje_en_modal_faenas ) : ?>
 
             <div
                 class="notice notice-<?php echo esc_attr( $tipo_mensaje ); ?> is-dismissible"
@@ -1808,6 +1870,12 @@ function sinacin_pagina_empresas() {
 
                     <div class="sinacin-modal-body">
 
+                        <?php if ( $mensaje_en_modal_faenas && $mensaje !== '' ) : ?>
+                            <div class="notice notice-<?php echo esc_attr( $tipo_mensaje ); ?> inline" role="alert">
+                                <p><?php echo esc_html( $mensaje ); ?></p>
+                            </div>
+                        <?php endif; ?>
+
                         <div class="sinacin-faena-form">
 
                             <h3>
@@ -2161,7 +2229,7 @@ function sinacin_pagina_empresas() {
             <input
                 type="hidden"
                 name="page"
-                value="sinacin"
+                value="sinacin-empresas"
             >
 
 
@@ -2237,7 +2305,7 @@ function sinacin_pagina_empresas() {
                     </th>
 
                     <th style="width:110px;">
-                        Faenas
+                        Faenas activas
                     </th>
 
                     <th
@@ -2336,8 +2404,9 @@ function sinacin_pagina_empresas() {
                                 <?php
                                 $cantidad_faenas = (int) $wpdb->get_var(
                                     $wpdb->prepare(
-                                        "SELECT COUNT(*) FROM {$tabla_faenas} WHERE empresa_id = %d",
-                                        $empresa->id
+                                        "SELECT COUNT(*) FROM {$tabla_faenas} WHERE empresa_id = %d AND estado = %s",
+                                        $empresa->id,
+                                        'ACTIVA'
                                     )
                                 );
 
@@ -2355,7 +2424,7 @@ function sinacin_pagina_empresas() {
                                     class="button button-small sinacin-abrir-faenas"
                                 >
                                     <?php echo esc_html( $cantidad_faenas ); ?>
-                                    <?php echo $cantidad_faenas === 1 ? 'faena' : 'faenas'; ?>
+                                    <?php echo $cantidad_faenas === 1 ? 'faena activa' : 'faenas activas'; ?>
                                 </a>
 
                             </td>
@@ -2427,7 +2496,7 @@ function sinacin_pagina_empresas() {
                                             add_query_arg(
                                                 array(
                                                     'page' =>
-                                                        'sinacin',
+                                                        'sinacin-empresas',
 
                                                     'editar' =>
                                                         $empresa->id,
@@ -2454,7 +2523,7 @@ function sinacin_pagina_empresas() {
                                         add_query_arg(
                                             array(
                                                 'page' =>
-                                                    'sinacin',
+                                                    'sinacin-empresas',
 
                                                 'accion' =>
                                                     'cambiar_estado',
@@ -2528,7 +2597,7 @@ function sinacin_pagina_empresas() {
                             add_query_arg(
                                 array(
                                     'page' =>
-                                        'sinacin',
+                                        'sinacin-empresas',
 
                                     'buscar' =>
                                         $buscar,

@@ -801,6 +801,122 @@ function sinacin_descargar_certificado() {
 }
 
 /* =========================================================
+ * ETAPA 3: OPERACIONES MASIVAS (solo afiliaciones activas)
+ * ========================================================= */
+add_action( 'admin_init', 'sinacin_procesar_operacion_masiva_afiliados' );
+
+function sinacin_procesar_operacion_masiva_afiliados() {
+    if ( ! isset( $_POST['sinacin_operacion_masiva'] ) ) {
+        return;
+    }
+    if ( ! current_user_can( 'sinacin_gestionar_afiliaciones' ) ) {
+        wp_die( 'No tienes permisos para realizar operaciones masivas.' );
+    }
+    check_admin_referer( 'sinacin_operacion_masiva_afiliados', 'sinacin_masiva_nonce' );
+
+    global $wpdb;
+    $tabla_afiliaciones = $wpdb->prefix . 'sinacin_afiliaciones';
+    $tabla_empresas     = $wpdb->prefix . 'sinacin_empresas';
+    $tabla_faenas       = $wpdb->prefix . 'sinacin_faenas';
+    $tabla_historial    = $wpdb->prefix . 'sinacin_historial';
+    $accion = isset( $_POST['sinacin_operacion_masiva'] )
+        ? sanitize_key( wp_unslash( $_POST['sinacin_operacion_masiva'] ) ) : '';
+    if ( ! in_array( $accion, array( 'desafiliar', 'cambiar_faena' ), true ) ) {
+        wp_die( 'Operación masiva no válida.' );
+    }
+    $ids = isset( $_POST['sinacin_afiliaciones_seleccionadas'] ) && is_array( $_POST['sinacin_afiliaciones_seleccionadas'] )
+        ? array_unique( array_filter( array_map( 'absint', wp_unslash( $_POST['sinacin_afiliaciones_seleccionadas'] ) ) ) )
+        : array();
+    // Máximo una página de resultados por operación. Nunca confiar en la selección del navegador.
+    if ( count( $ids ) < 2 || count( $ids ) > 20 ) {
+        wp_die( 'Selecciona entre 2 y 20 afiliaciones para esta operación.' );
+    }
+    $destino_id = isset( $_POST['sinacin_faena_destino'] ) ? absint( $_POST['sinacin_faena_destino'] ) : 0;
+    $destino = null;
+    if ( $accion === 'cambiar_faena' ) {
+        $destino = $wpdb->get_row( $wpdb->prepare(
+            "SELECT f.id, f.empresa_id, f.nombre_faena FROM {$tabla_faenas} f
+             INNER JOIN {$tabla_empresas} e ON e.id = f.empresa_id
+             WHERE f.id = %d AND f.estado = 'ACTIVA' AND e.estado = 'ACTIVA' LIMIT 1",
+            $destino_id
+        ) );
+        if ( ! $destino ) {
+            wp_die( 'La faena de destino no está activa o su empresa no está activa.' );
+        }
+    }
+    $correctos = 0;
+    $omitidos = 0;
+    $fecha = current_time( 'mysql' );
+    $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : null;
+    foreach ( $ids as $id ) {
+        // Bloqueo por registro: evita cambios simultáneos entre validación y actualización.
+        $wpdb->query( 'START TRANSACTION' );
+        $afiliacion = $wpdb->get_row( $wpdb->prepare(
+            "SELECT a.id, a.empresa_id, a.faena_id, a.estado, f.nombre_faena AS faena_anterior,
+                    f.estado AS estado_faena, e.estado AS estado_empresa
+             FROM {$tabla_afiliaciones} a
+             INNER JOIN {$tabla_faenas} f ON f.id = a.faena_id
+             INNER JOIN {$tabla_empresas} e ON e.id = a.empresa_id
+             WHERE a.id = %d LIMIT 1 FOR UPDATE", $id
+        ) );
+        if ( ! $afiliacion || $afiliacion->estado !== 'ACTIVA' ) {
+            $wpdb->query( 'ROLLBACK' );
+            ++$omitidos;
+            continue;
+        }
+        if ( $accion === 'cambiar_faena' && (
+            (int) $afiliacion->empresa_id !== (int) $destino->empresa_id ||
+            (int) $afiliacion->faena_id === (int) $destino->id ||
+            $afiliacion->estado_empresa !== 'ACTIVA' || $afiliacion->estado_faena !== 'ACTIVA'
+        ) ) {
+            $wpdb->query( 'ROLLBACK' );
+            ++$omitidos;
+            continue;
+        }
+        if ( $accion === 'desafiliar' ) {
+            $actualizado = $wpdb->update( $tabla_afiliaciones,
+                array( 'estado' => 'DESAFILIADA', 'fecha_desafiliacion' => $fecha ),
+                array( 'id' => $id, 'estado' => 'ACTIVA' ),
+                array( '%s', '%s' ), array( '%d', '%s' )
+            );
+            $descripcion = 'Desafiliación masiva: afiliación marcada como DESAFILIADA.';
+            $accion_historial = 'DESAFILIAR';
+        } else {
+            $actualizado = $wpdb->update( $tabla_afiliaciones,
+                array( 'faena_id' => $destino_id ),
+                array( 'id' => $id, 'estado' => 'ACTIVA', 'empresa_id' => $destino->empresa_id ),
+                array( '%d' ), array( '%d', '%s', '%d' )
+            );
+            $descripcion = 'Cambio masivo de faena desde "' . $afiliacion->faena_anterior . '" a "' . $destino->nombre_faena . '".';
+            $accion_historial = 'CAMBIAR_FAENA';
+        }
+        if ( 1 !== $actualizado ) {
+            $wpdb->query( 'ROLLBACK' );
+            ++$omitidos;
+            continue;
+        }
+        $registrado = $wpdb->insert( $tabla_historial, array(
+            'usuario_id' => get_current_user_id(), 'entidad' => 'AFILIACION',
+            'entidad_id' => $id, 'accion' => $accion_historial,
+            'descripcion' => $descripcion, 'ip' => $ip, 'fecha' => $fecha,
+        ), array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' ) );
+        if ( false === $registrado ) {
+            $wpdb->query( 'ROLLBACK' );
+            ++$omitidos;
+            continue;
+        }
+        $wpdb->query( 'COMMIT' );
+        ++$correctos;
+    }
+    $url = add_query_arg( array(
+        'page' => 'sinacin-afiliados', 'sinacin_masiva_resultado' => $accion,
+        'sinacin_masiva_ok' => $correctos, 'sinacin_masiva_omitidos' => $omitidos,
+    ), admin_url( 'admin.php' ) );
+    wp_safe_redirect( $url );
+    exit;
+}
+
+/* =========================================================
  * PÁGINA PRINCIPAL
  * ========================================================= */
 
@@ -908,6 +1024,17 @@ function sinacin_pagina_afiliados() {
     }
 
 
+    if ( isset( $_GET['sinacin_masiva_resultado'], $_GET['sinacin_masiva_ok'], $_GET['sinacin_masiva_omitidos'] ) ) {
+        $tipo = sanitize_key( wp_unslash( $_GET['sinacin_masiva_resultado'] ) );
+        if ( in_array( $tipo, array( 'desafiliar', 'cambiar_faena' ), true ) ) {
+            $ok = absint( $_GET['sinacin_masiva_ok'] );
+            $omitidos = absint( $_GET['sinacin_masiva_omitidos'] );
+            echo '<div class="notice notice-info is-dismissible"><p>' . esc_html(
+                sprintf( 'Operación masiva finalizada: %d actualizados, %d omitidos o no procesados.', $ok, $omitidos )
+            ) . '</p></div>';
+        }
+    }
+
     /* =====================================================
      * BÚSQUEDA
      * ===================================================== */
@@ -930,6 +1057,58 @@ function sinacin_pagina_afiliados() {
             )
             : 'ACTIVA';
 
+    // Filtros por empresa y faena, siempre validados como identificadores.
+    $empresa_filtro = isset( $_GET['empresa_id'] ) ? absint( $_GET['empresa_id'] ) : 0;
+    $faena_filtro   = isset( $_GET['faena_id'] ) ? absint( $_GET['faena_id'] ) : 0;
+
+    // Lista blanca de columnas SQL para impedir ORDER BY arbitrarios.
+    $columnas_orden = array(
+        'afiliado' => 'p.apellido_paterno, p.apellido_materno, p.nombres',
+        'rut'      => 'p.rut',
+        'empresa'  => 'e.nombre_empresa',
+        'faena'    => 'f.nombre_faena',
+        'estado'   => 'a.estado',
+        'fecha'    => 'a.fecha_afiliacion',
+    );
+    $ordenar = isset( $_GET['ordenar'] ) ? sanitize_key( wp_unslash( $_GET['ordenar'] ) ) : 'fecha';
+    if ( ! isset( $columnas_orden[ $ordenar ] ) ) {
+        $ordenar = 'fecha';
+    }
+    $direccion = isset( $_GET['direccion'] ) ? strtoupper( sanitize_key( wp_unslash( $_GET['direccion'] ) ) ) : 'DESC';
+    if ( ! in_array( $direccion, array( 'ASC', 'DESC' ), true ) ) {
+        $direccion = 'DESC';
+    }
+    $sql_orden = implode( ' ' . $direccion . ', ', explode( ', ', $columnas_orden[ $ordenar ] ) ) . ' ' . $direccion . ', a.id DESC';
+
+    // En afiliaciones activas solo se ofrecen empresas y faenas activas.
+    // En desafiliadas o todos los estados se conserva el historial completo.
+    $solo_activas = ( $estado === 'ACTIVA' );
+    $condicion_empresa = $solo_activas ? " WHERE estado = 'ACTIVA'" : '';
+    $empresas_filtro = $wpdb->get_results(
+        "SELECT id, nombre_empresa FROM {$tabla_empresas}{$condicion_empresa} ORDER BY nombre_empresa ASC"
+    );
+
+    // Una empresa inactiva previamente seleccionada deja de ser válida al cambiar a activos.
+    $ids_empresas = array_map( 'intval', wp_list_pluck( $empresas_filtro, 'id' ) );
+    if ( $empresa_filtro > 0 && ! in_array( $empresa_filtro, $ids_empresas, true ) ) {
+        $empresa_filtro = 0;
+        $faena_filtro = 0;
+    }
+
+    $faenas_filtro = array();
+    if ( $empresa_filtro > 0 ) {
+        $condicion_faena = $solo_activas ? " AND estado = 'ACTIVA'" : '';
+        $faenas_filtro = $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, nombre_faena FROM {$tabla_faenas} WHERE empresa_id = %d{$condicion_faena} ORDER BY nombre_faena ASC",
+            $empresa_filtro
+        ) );
+    }
+
+    // Invalidar una faena que no pertenece a la empresa o que dejó de estar disponible.
+    $ids_faenas = array_map( 'intval', wp_list_pluck( $faenas_filtro, 'id' ) );
+    if ( $faena_filtro > 0 && ! in_array( $faena_filtro, $ids_faenas, true ) ) {
+        $faena_filtro = 0;
+    }
 
     /* =====================================================
      * PAGINACIÓN
@@ -981,36 +1160,26 @@ function sinacin_pagina_afiliados() {
     }
 
 
+    if ( $empresa_filtro > 0 ) {
+        $where .= ' AND a.empresa_id = %d';
+        $params[] = $empresa_filtro;
+    }
+    if ( $faena_filtro > 0 ) {
+        $where .= ' AND a.faena_id = %d';
+        $params[] = $faena_filtro;
+    }
+
     if ( $buscar !== '' ) {
-
-        $where .= "
-            AND (
-                CONCAT(
-                    p.nombres,
-                    ' ',
-                    p.apellido_paterno,
-                    ' ',
-                    p.apellido_materno
-                ) LIKE %s
-                OR p.rut LIKE %s
-                OR e.nombre_empresa LIKE %s
-                OR e.rut_empresa LIKE %s
-                OR f.nombre_faena LIKE %s
-            )
-        ";
-
-        $buscar_like =
-            '%' .
-            $wpdb->esc_like(
-                $buscar
-            ) .
-            '%';
-
+        // Buscar únicamente por nombre completo o RUT, con o sin puntuación.
+        $rut_buscar = strtoupper( preg_replace( '/[^0-9K]/i', '', $buscar ) );
+        $buscar_like = '%' . $wpdb->esc_like( $buscar ) . '%';
+        $where .= " AND (CONCAT_WS(' ', p.nombres, p.apellido_paterno, p.apellido_materno) LIKE %s";
         $params[] = $buscar_like;
-        $params[] = $buscar_like;
-        $params[] = $buscar_like;
-        $params[] = $buscar_like;
-        $params[] = $buscar_like;
+        if ( $rut_buscar !== '' ) {
+            $where .= " OR UPPER(REPLACE(REPLACE(REPLACE(p.rut, '.', ''), '-', ''), ' ', '')) LIKE %s";
+            $params[] = '%' . $wpdb->esc_like( $rut_buscar ) . '%';
+        }
+        $where .= ' )';
     }
 
 
@@ -1107,8 +1276,7 @@ function sinacin_pagina_afiliados() {
 
         {$where}
 
-        ORDER BY
-            a.id DESC
+        ORDER BY {$sql_orden}
 
         LIMIT %d OFFSET %d
     ";
@@ -1167,11 +1335,33 @@ function sinacin_pagina_afiliados() {
                 type="search"
                 name="buscar"
                 value="<?php echo esc_attr( $buscar ); ?>"
-                placeholder="Buscar por nombre, RUT, empresa o faena..."
+                placeholder="Buscar por nombre o RUT (ej.: 01.234.567-8)"
                 class="regular-text"
             >
 
-            <select name="estado">
+            <label for="sinacin-filtro-empresa">Empresa</label>
+            <select name="empresa_id" id="sinacin-filtro-empresa">
+                <option value="0">Todas las empresas</option>
+                <?php foreach ( $empresas_filtro as $empresa_opcion ) : ?>
+                    <option value="<?php echo esc_attr( $empresa_opcion->id ); ?>" <?php selected( $empresa_filtro, (int) $empresa_opcion->id ); ?>>
+                        <?php echo esc_html( $empresa_opcion->nombre_empresa ); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
+            <label for="sinacin-filtro-faena">Faena / Obra</label>
+            <select name="faena_id" id="sinacin-filtro-faena" <?php disabled( $empresa_filtro === 0 ); ?>>
+                <option value="0">Todas las faenas</option>
+                <?php foreach ( $faenas_filtro as $faena_opcion ) : ?>
+                    <option value="<?php echo esc_attr( $faena_opcion->id ); ?>" <?php selected( $faena_filtro, (int) $faena_opcion->id ); ?>>
+                        <?php echo esc_html( $faena_opcion->nombre_faena ); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
+            <label for="sinacin-filtro-estado">Estado</label>
+            <select name="estado" id="sinacin-filtro-estado">
+                <option value="" <?php selected( $estado, '' ); ?>>Todos los estados</option>
 
                 <option
                     value="ACTIVA"
@@ -1195,12 +1385,10 @@ function sinacin_pagina_afiliados() {
 
             </select>
 
-            <button
-                type="submit"
-                class="button button-primary"
-            >
-                Buscar
-            </button>
+            <input type="hidden" name="ordenar" value="<?php echo esc_attr( $ordenar ); ?>">
+            <input type="hidden" name="direccion" value="<?php echo esc_attr( $direccion ); ?>">
+
+            <span class="description" id="sinacin-busqueda-estado" role="status" aria-live="polite">Búsqueda automática</span>
 
             <a
                 href="<?php echo esc_url(
@@ -1231,9 +1419,64 @@ function sinacin_pagina_afiliados() {
         </div>
 
 
+         <?php
+         $url_ordenar = static function ( $columna ) use ( $buscar, $estado, $empresa_filtro, $faena_filtro, $ordenar, $direccion ) {
+             $nueva_direccion = ( $ordenar === $columna && $direccion === 'ASC' ) ? 'DESC' : 'ASC';
+             return add_query_arg(
+                 array(
+                     'page'      => 'sinacin-afiliados',
+                     'buscar'    => $buscar,
+                     'estado'    => $estado,
+                     'empresa_id'=> $empresa_filtro,
+                     'faena_id'  => $faena_filtro,
+                     'ordenar'   => $columna,
+                     'direccion' => $nueva_direccion,
+                 ),
+                 admin_url( 'admin.php' )
+             );
+         };
+         $encabezado_orden = static function ( $etiqueta, $columna ) use ( $url_ordenar, $ordenar, $direccion ) {
+             $indicador = $ordenar === $columna ? ( $direccion === 'ASC' ? ' ↑' : ' ↓' ) : ' ↕';
+             echo '<a class="sinacin-orden-enlace" href="' . esc_url( $url_ordenar( $columna ) ) . '">'
+                 . esc_html( $etiqueta . $indicador ) . '</a>';
+         };
+         ?>
+
         <!-- ==========================================
              TABLA
              ========================================== -->
+
+        <?php if ( $estado === 'ACTIVA' ) : ?>
+        <form id="sinacin-form-masivo" method="post" class="sinacin-masivo-controles">
+            <?php wp_nonce_field( 'sinacin_operacion_masiva_afiliados', 'sinacin_masiva_nonce' ); ?>
+            <label for="sinacin-operacion-masiva">Acción masiva</label>
+            <select name="sinacin_operacion_masiva" id="sinacin-operacion-masiva" required>
+                <option value="">Seleccionar acción</option>
+                <option value="desafiliar">Desafiliar seleccionados</option>
+                <option value="cambiar_faena">Cambiar faena de seleccionados</option>
+            </select>
+            <label for="sinacin-faena-destino" id="sinacin-destino-etiqueta" hidden>Faena de destino</label>
+            <select name="sinacin_faena_destino" id="sinacin-faena-destino" hidden disabled>
+                <option value="">Seleccionar faena activa</option>
+                <?php
+                // Opciones con empresa para validar coincidencia entre todos los seleccionados.
+                $destinos = $wpdb->get_results(
+                    "SELECT f.id, f.empresa_id, f.nombre_faena, e.nombre_empresa
+                     FROM {$tabla_faenas} f INNER JOIN {$tabla_empresas} e ON e.id = f.empresa_id
+                     WHERE f.estado = 'ACTIVA' AND e.estado = 'ACTIVA'
+                     ORDER BY e.nombre_empresa ASC, f.nombre_faena ASC"
+                );
+                foreach ( $destinos as $opcion_destino ) : ?>
+                    <option value="<?php echo esc_attr( $opcion_destino->id ); ?>"
+                            data-empresa="<?php echo esc_attr( $opcion_destino->empresa_id ); ?>">
+                        <?php echo esc_html( $opcion_destino->nombre_empresa . ' — ' . $opcion_destino->nombre_faena ); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="button button-secondary" id="sinacin-aplicar-masiva" disabled>Aplicar a seleccionados</button>
+            <span id="sinacin-seleccion-contador" class="description">0 seleccionados (máximo 20 por página)</span>
+        </form>
+        <?php endif; ?>
 
         <div class="sinacin-tabla-wrapper">
 
@@ -1244,29 +1487,32 @@ function sinacin_pagina_afiliados() {
                 <thead>
 
                     <tr>
+                        <?php if ( $estado === 'ACTIVA' ) : ?>
+                        <th class="sinacin-columna-seleccion"><input type="checkbox" id="sinacin-seleccionar-todos" aria-label="Seleccionar todos los afiliados de esta página"></th>
+                        <?php endif; ?>
 
                         <th>
-                            Afiliado
+                            <?php $encabezado_orden( 'Afiliado', 'afiliado' ); ?>
                         </th>
 
                         <th>
-                            RUT
+                            <?php $encabezado_orden( 'RUT', 'rut' ); ?>
                         </th>
 
                         <th>
-                            Empresa
+                            <?php $encabezado_orden( 'Empresa', 'empresa' ); ?>
                         </th>
 
                         <th>
-                            Faena / Obra
+                            <?php $encabezado_orden( 'Faena / Obra', 'faena' ); ?>
                         </th>
 
                         <th>
-                            Estado
+                            <?php $encabezado_orden( 'Estado', 'estado' ); ?>
                         </th>
 
                         <th>
-                            Fecha afiliación
+                            <?php $encabezado_orden( 'Fecha afiliación', 'fecha' ); ?>
                         </th>
 
                         <th>
@@ -1285,7 +1531,7 @@ function sinacin_pagina_afiliados() {
                         <tr>
 
                             <td
-                                colspan="7"
+                                colspan="<?php echo $estado === 'ACTIVA' ? 8 : 7; ?>"
                             >
 
                                 No se encontraron afiliados.
@@ -1371,6 +1617,19 @@ function sinacin_pagina_afiliados() {
                             ?>
 
                             <tr>
+                                <?php if ( $estado === 'ACTIVA' ) : ?>
+                                <td class="sinacin-columna-seleccion">
+                                    <?php if ( $afiliado->estado === 'ACTIVA' ) : ?>
+                                    <input type="checkbox" class="sinacin-seleccionar-afiliado"
+                                           name="sinacin_afiliaciones_seleccionadas[]"
+                                           value="<?php echo esc_attr( $afiliado->afiliacion_id ); ?>"
+                                           data-empresa="<?php echo esc_attr( $afiliado->empresa_id ); ?>"
+                                           data-faena="<?php echo esc_attr( $afiliado->faena_id ); ?>"
+                                           form="sinacin-form-masivo"
+                                           aria-label="Seleccionar afiliación de <?php echo esc_attr( $nombre_completo ); ?>">
+                                    <?php endif; ?>
+                                </td>
+                                <?php endif; ?>
 
                                 <td>
 
@@ -1528,6 +1787,7 @@ function sinacin_pagina_afiliados() {
              PAGINACIÓN
              ========================================== -->
 
+        <div id="sinacin-paginacion-dinamica">
         <?php if (
             $total_paginas > 1
         ) : ?>
@@ -1560,8 +1820,11 @@ function sinacin_pagina_afiliados() {
                                         'sinacin-afiliados',
                                     'buscar' =>
                                         $buscar,
-                                    'estado' =>
-                                        $estado,
+                                     'estado' => $estado,
+                                     'empresa_id' => $empresa_filtro,
+                                     'faena_id' => $faena_filtro,
+                                     'ordenar' => $ordenar,
+                                     'direccion' => $direccion,
                                 ),
                         )
                     );
@@ -1573,6 +1836,7 @@ function sinacin_pagina_afiliados() {
             </div>
 
         <?php endif; ?>
+        </div>
 
     </div>
 
@@ -1588,6 +1852,11 @@ function sinacin_pagina_afiliados() {
         }
 
 
+        .sinacin-masivo-controles { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:18px 0 10px; }
+        .sinacin-masivo-controles label { font-weight:600; }
+        .sinacin-columna-seleccion { width:38px; text-align:center; }
+        .sinacin-masivo-controles [hidden] { display:none !important; }
+
         .sinacin-resumen-afiliados {
             margin: 15px 0;
             color: #50575e;
@@ -1600,9 +1869,12 @@ function sinacin_pagina_afiliados() {
         }
 
 
-        .sinacin-tabla-afiliados th {
-            font-weight: 600;
+         .sinacin-tabla-afiliados th {
+             font-weight: 600;
         }
+        .sinacin-orden-enlace { color: inherit; text-decoration: none; }
+        .sinacin-orden-enlace:hover { color: #2271b1; text-decoration: underline; }
+        .sinacin-filtros label { font-weight: 600; }
 
 
         .sinacin-texto-secundario {
@@ -1652,6 +1924,186 @@ function sinacin_pagina_afiliados() {
         }
 
     </style>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.querySelector('.sinacin-filtros');
+        if (!form) return;
+        var campo = form.querySelector('[name="buscar"]');
+        var empresa = document.getElementById('sinacin-filtro-empresa');
+        var faena = document.getElementById('sinacin-filtro-faena');
+        var estado = document.getElementById('sinacin-filtro-estado');
+        var aviso = document.getElementById('sinacin-busqueda-estado');
+        var temporizador = null;
+        var controlador = null;
+        var secuencia = 0;
+
+        function pareceRut(valor) {
+            return /^[0-9.\-\sKk]+$/.test(valor) && /[0-9]/.test(valor);
+        }
+        function formatoRut(valor) {
+            var limpio = valor.toUpperCase().replace(/[^0-9K]/g, '');
+            if (limpio.length < 2) return limpio;
+            var cuerpo = limpio.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return cuerpo + '-' + limpio.slice(-1);
+        }
+        function urlFiltros() {
+            var url = new URL(form.action || window.location.href, window.location.href);
+            url.search = new URLSearchParams(new FormData(form)).toString();
+            url.searchParams.delete('paged');
+            return url;
+        }
+        function actualizar(url, guardarHistorial) {
+            var turno = ++secuencia;
+            if (controlador) controlador.abort();
+            controlador = new AbortController();
+            aviso.textContent = 'Buscando…';
+            fetch(url.toString(), { credentials: 'same-origin', signal: controlador.signal })
+                .then(function (respuesta) {
+                    if (!respuesta.ok) throw new Error('Error de conexión');
+                    return respuesta.text();
+                })
+                .then(function (html) {
+                    if (turno !== secuencia) return;
+                    var documento = new DOMParser().parseFromString(html, 'text/html');
+                    ['.sinacin-resumen-afiliados', '.sinacin-tabla-wrapper', '#sinacin-paginacion-dinamica'].forEach(function (selector) {
+                        var nuevo = documento.querySelector(selector);
+                        var actual = document.querySelector(selector);
+                        if (nuevo && actual) actual.replaceWith(nuevo);
+                    });
+                    if (window.sinacinRefrescarMasivo) window.sinacinRefrescarMasivo();
+                    // Sincronizar ambos filtros con las opciones validadas en PHP.
+                    // Al pasar a activos, desaparecen empresas/faenas inactivas.
+                    var nuevasEmpresas = documento.getElementById('sinacin-filtro-empresa');
+                    if (nuevasEmpresas) {
+                        empresa.innerHTML = nuevasEmpresas.innerHTML;
+                        empresa.value = nuevasEmpresas.value;
+                    }
+                    var nuevasFaenas = documento.getElementById('sinacin-filtro-faena');
+                    if (nuevasFaenas) {
+                        faena.innerHTML = nuevasFaenas.innerHTML;
+                        faena.disabled = nuevasFaenas.disabled;
+                        faena.value = nuevasFaenas.value;
+                    }
+                    // Reflejar la selección efectiva en la URL para evitar filtros obsoletos.
+                    url.searchParams.set('empresa_id', empresa.value);
+                    url.searchParams.set('faena_id', faena.value);
+                    var nuevoOrden = documento.querySelector('.sinacin-filtros [name="ordenar"]');
+                    var nuevaDireccion = documento.querySelector('.sinacin-filtros [name="direccion"]');
+                    if (nuevoOrden) form.querySelector('[name="ordenar"]').value = nuevoOrden.value;
+                    if (nuevaDireccion) form.querySelector('[name="direccion"]').value = nuevaDireccion.value;
+                    if (masivo) {
+                        masivo.hidden = estado.value !== 'ACTIVA';
+                        if (window.sinacinRefrescarMasivo) window.sinacinRefrescarMasivo();
+                    }
+                    if (guardarHistorial) window.history.replaceState({}, '', url.toString());
+                    aviso.textContent = 'Resultados actualizados';
+                })
+                .catch(function (error) {
+                    if (error.name !== 'AbortError' && turno === secuencia) {
+                        aviso.textContent = 'No se pudo actualizar. Presiona Enter para buscar.';
+                    }
+                });
+        }
+        function programar() {
+            clearTimeout(temporizador);
+            temporizador = setTimeout(function () { actualizar(urlFiltros(), true); }, 300);
+        }
+        campo.addEventListener('input', function () {
+            var inicio = campo.selectionStart;
+            var antes = campo.value;
+            if (pareceRut(antes) && /[.\-]/.test(antes)) {
+                var formateado = formatoRut(antes);
+                if (formateado !== antes) {
+                    campo.value = formateado;
+                    if (inicio === antes.length) campo.setSelectionRange(formateado.length, formateado.length);
+                }
+            }
+            programar();
+        });
+        empresa.addEventListener('change', function () { faena.value = '0'; programar(); });
+        faena.addEventListener('change', programar);
+        estado.addEventListener('change', programar);
+        form.addEventListener('submit', function (evento) {
+            evento.preventDefault();
+            clearTimeout(temporizador);
+            actualizar(urlFiltros(), true);
+        });
+        var masivo = document.getElementById('sinacin-form-masivo');
+        if (masivo) {
+            var operacion = document.getElementById('sinacin-operacion-masiva');
+            var destino = document.getElementById('sinacin-faena-destino');
+            var destinoEtiqueta = document.getElementById('sinacin-destino-etiqueta');
+            var aplicar = document.getElementById('sinacin-aplicar-masiva');
+            var contador = document.getElementById('sinacin-seleccion-contador');
+            function seleccionados() {
+                return Array.from(document.querySelectorAll('.sinacin-seleccionar-afiliado:checked'));
+            }
+            function refrescarMasivo() {
+                var seleccion = seleccionados();
+                var cambio = operacion.value === 'cambiar_faena';
+                destino.hidden = !cambio;
+                destinoEtiqueta.hidden = !cambio;
+                destino.disabled = !cambio;
+                var empresas = Array.from(new Set(seleccion.map(function (item) { return item.dataset.empresa; })));
+                Array.from(destino.options).forEach(function (opcion) {
+                    if (!opcion.value) return;
+                    opcion.disabled = empresas.length !== 1 || opcion.dataset.empresa !== empresas[0];
+                });
+                if (destino.selectedOptions.length && destino.selectedOptions[0].disabled) destino.value = '';
+                var valido = seleccion.length >= 2 && seleccion.length <= 20 && operacion.value &&
+                    (!cambio || (empresas.length === 1 && destino.value));
+                aplicar.disabled = !valido;
+                contador.textContent = seleccion.length + ' seleccionados (máximo 20 por página)' +
+                    (cambio && empresas.length > 1 ? ' — selecciona afiliados de una sola empresa' : '');
+                var todos = document.getElementById('sinacin-seleccionar-todos');
+                var casillas = document.querySelectorAll('.sinacin-seleccionar-afiliado');
+                if (todos) {
+                    todos.checked = casillas.length > 0 && seleccion.length === casillas.length;
+                    todos.indeterminate = seleccion.length > 0 && seleccion.length < casillas.length;
+                }
+            }
+            document.addEventListener('change', function (evento) {
+                if (evento.target.id === 'sinacin-seleccionar-todos') {
+                    document.querySelectorAll('.sinacin-seleccionar-afiliado').forEach(function (casilla) {
+                        casilla.checked = evento.target.checked;
+                    });
+                }
+                if (evento.target.matches('.sinacin-seleccionar-afiliado, #sinacin-seleccionar-todos, #sinacin-operacion-masiva, #sinacin-faena-destino')) {
+                    refrescarMasivo();
+                }
+            });
+            masivo.addEventListener('submit', function (evento) {
+                if (estado.value !== 'ACTIVA') { evento.preventDefault(); return; }
+                var seleccion = seleccionados();
+                if (seleccion.length < 2 || seleccion.length > 20 || aplicar.disabled) {
+                    evento.preventDefault();
+                    return;
+                }
+                var mensaje = operacion.value === 'desafiliar'
+                    ? '¿Confirmas la desafiliación de ' + seleccion.length + ' afiliaciones? Esta acción quedará registrada en el historial.'
+                    : '¿Confirmas el cambio de faena de ' + seleccion.length + ' afiliaciones? Cada cambio quedará registrado en el historial.';
+                if (!window.confirm(mensaje)) evento.preventDefault();
+            });
+            // Los resultados AJAX reemplazan las filas: la selección es exclusivamente de la página visible.
+            var observer = new MutationObserver(refrescarMasivo);
+            observer.observe(document.querySelector('.sinacin-admin'), { childList:true, subtree:false });
+            refrescarMasivo();
+            window.sinacinRefrescarMasivo = refrescarMasivo;
+        }
+        document.addEventListener('click', function (evento) {
+            var enlace = evento.target.closest('.sinacin-orden-enlace, #sinacin-paginacion-dinamica a');
+            if (!enlace) return;
+            evento.preventDefault();
+            clearTimeout(temporizador);
+            var url = new URL(enlace.href);
+            if (url.searchParams.has('ordenar')) {
+                form.querySelector('[name="ordenar"]').value = url.searchParams.get('ordenar');
+                form.querySelector('[name="direccion"]').value = url.searchParams.get('direccion');
+            }
+            actualizar(url, true);
+        });
+    });
+    </script>
 
     <?php
 }
