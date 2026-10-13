@@ -54,7 +54,7 @@ function sinacin_ocultar_menus_gestor() {
     }
     if ( isset( $submenu['sinacin'] ) ) {
         foreach ( $submenu['sinacin'] as $entrada ) {
-            if ( ! in_array( $entrada[2], array( 'sinacin', 'sinacin-solicitudes', 'sinacin-afiliados', 'sinacin-empresas' ), true ) ) {
+            if ( ! in_array( $entrada[2], array( 'sinacin', 'sinacin-solicitudes', 'sinacin-afiliados', 'sinacin-empresas', 'sinacin-historial' ), true ) ) {
                 remove_submenu_page( 'sinacin', $entrada[2] );
             }
         }
@@ -71,7 +71,7 @@ function sinacin_restringir_paginas_gestor() {
     if ( in_array( $pagenow, array( 'admin-ajax.php', 'admin-post.php' ), true ) ) { return; }
     if ( $pagenow === 'admin.php' ) {
         $pagina = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-        if ( in_array( $pagina, array( 'sinacin', 'sinacin-solicitudes', 'sinacin-afiliados', 'sinacin-empresas' ), true ) ) {
+        if ( in_array( $pagina, array( 'sinacin', 'sinacin-solicitudes', 'sinacin-afiliados', 'sinacin-empresas', 'sinacin-historial' ), true ) ) {
             return;
         }
     }

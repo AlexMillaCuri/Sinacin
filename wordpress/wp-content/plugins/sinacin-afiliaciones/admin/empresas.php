@@ -437,6 +437,31 @@ function sinacin_empresa_esta_activa( $empresa_id ) {
  * ==========================================
  */
 
+
+/** Guarda un evento de empresa o faena sin alterar la estructura de tablas. */
+function sinacin_auditar_empresa_faena( $entidad, $id, $accion, $resumen, $antes, $despues ) {
+    global $wpdb;
+    $cambios = array();
+    foreach ( $despues as $campo => $valor ) {
+        $anterior = array_key_exists( $campo, $antes ) ? $antes[ $campo ] : '—';
+        if ( (string) $anterior !== (string) $valor ) {
+            $cambios[ $campo ] = array( 'anterior' => $anterior, 'nuevo' => $valor );
+        }
+    }
+    $descripcion = 'SINACIN_CAMBIO:' . wp_json_encode( array( 'resumen' => $resumen, 'cambios' => $cambios ), JSON_UNESCAPED_UNICODE );
+    $ok = $wpdb->insert( $wpdb->prefix . 'sinacin_historial', array(
+        'usuario_id' => get_current_user_id(),
+        'entidad' => $entidad,
+        'entidad_id' => absint( $id ),
+        'accion' => $accion,
+        'descripcion' => $descripcion,
+        'ip' => isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : null,
+        'fecha' => current_time( 'mysql' ),
+    ), array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' ) );
+    if ( false === $ok ) { error_log( 'SINACIN: no se pudo registrar auditoría de ' . $entidad . ' #' . absint( $id ) ); }
+    return false !== $ok;
+}
+
 function sinacin_pagina_empresas() {
 
     if (
@@ -712,6 +737,7 @@ function sinacin_pagina_empresas() {
                         $id > 0
                     ) {
 
+                        $empresa_anterior = $wpdb->get_row( $wpdb->prepare( "SELECT rut_empresa, nombre_empresa, estado FROM {$tabla_empresas} WHERE id = %d", $id ), ARRAY_A );
                         $resultado =
                             $wpdb->update(
                                 $tabla_empresas,
@@ -754,6 +780,7 @@ function sinacin_pagina_empresas() {
                             $resultado !== false
                         ) {
 
+                            sinacin_auditar_empresa_faena( 'EMPRESA', $id, 'EDITAR', 'Empresa actualizada: ' . $nombre_empresa, array( 'RUT empresa' => isset( $empresa_anterior['rut_empresa'] ) ? $empresa_anterior['rut_empresa'] : '—', 'Nombre empresa' => isset( $empresa_anterior['nombre_empresa'] ) ? $empresa_anterior['nombre_empresa'] : '—', 'Estado' => isset( $empresa_anterior['estado'] ) ? $empresa_anterior['estado'] : '—' ), array( 'RUT empresa' => $rut_empresa, 'Nombre empresa' => $nombre_empresa, 'Estado' => $estado ) );
                             $mensaje =
                                 'Empresa actualizada correctamente.';
 
@@ -820,6 +847,7 @@ function sinacin_pagina_empresas() {
                             $resultado !== false
                         ) {
 
+                            sinacin_auditar_empresa_faena( 'EMPRESA', $wpdb->insert_id, 'CREAR', 'Empresa registrada: ' . $nombre_empresa, array(), array( 'RUT empresa' => $rut_empresa, 'Nombre empresa' => $nombre_empresa, 'Estado' => $estado ) );
                             $mensaje =
                                 'Empresa registrada correctamente.';
 
@@ -974,6 +1002,8 @@ function sinacin_pagina_empresas() {
                         $resultado !== false
                     ) {
 
+                        $nombre_auditado = $wpdb->get_var( $wpdb->prepare( "SELECT nombre_empresa FROM {$tabla_empresas} WHERE id = %d", $id ) );
+                        sinacin_auditar_empresa_faena( 'EMPRESA', $id, $nuevo_estado === 'ACTIVA' ? 'ACTIVAR' : 'DESACTIVAR', 'Estado de empresa: ' . $nombre_auditado, array( 'Estado' => $estado_actual ), array( 'Estado' => $nuevo_estado ) );
                         $mensaje =
                             'Estado de la empresa actualizado correctamente.';
 
@@ -1082,6 +1112,7 @@ function sinacin_pagina_empresas() {
                         $mensaje = 'Ya existe una faena con ese nombre en esta empresa.';
                         $tipo_mensaje = 'error';
                     } elseif ( $faena_id > 0 ) {
+                        $faena_anterior = $wpdb->get_row( $wpdb->prepare( "SELECT nombre_faena, estado FROM {$tabla_faenas} WHERE id = %d", $faena_id ), ARRAY_A );
                         $resultado = $wpdb->update(
                             $tabla_faenas,
                             array(
@@ -1096,6 +1127,7 @@ function sinacin_pagina_empresas() {
                         );
 
                         if ( $resultado !== false ) {
+                            sinacin_auditar_empresa_faena( 'FAENA', $faena_id, 'EDITAR', 'Faena actualizada: ' . $nombre_faena, array( 'Nombre faena' => $faena_anterior['nombre_faena'], 'Estado' => $faena_anterior['estado'] ), array( 'Nombre faena' => $nombre_faena, 'Estado' => $estado_faena ) );
                             $mensaje = 'Faena actualizada correctamente.';
                             $tipo_mensaje = 'success';
                             $empresa_faenas_id = $empresa_id;
@@ -1117,6 +1149,7 @@ function sinacin_pagina_empresas() {
                         );
 
                         if ( $resultado !== false ) {
+                            sinacin_auditar_empresa_faena( 'FAENA', $wpdb->insert_id, 'CREAR', 'Faena registrada: ' . $nombre_faena, array(), array( 'Nombre faena' => $nombre_faena, 'Estado' => $estado_faena ) );
                             $mensaje = 'Faena registrada correctamente.';
                             $tipo_mensaje = 'success';
                             $empresa_faenas_id = $empresa_id;
@@ -1181,6 +1214,8 @@ function sinacin_pagina_empresas() {
                 );
 
                 if ( $resultado !== false ) {
+                    $nombre_auditado = $wpdb->get_var( $wpdb->prepare( "SELECT nombre_faena FROM {$tabla_faenas} WHERE id = %d", $faena_id ) );
+                    sinacin_auditar_empresa_faena( 'FAENA', $faena_id, $nuevo_estado === 'ACTIVA' ? 'ACTIVAR' : 'DESACTIVAR', 'Estado de faena: ' . $nombre_auditado, array( 'Estado' => $estado_actual ), array( 'Estado' => $nuevo_estado ) );
                     $mensaje = 'Estado de la faena actualizado correctamente.';
                     $tipo_mensaje = 'success';
                 } else {
