@@ -317,7 +317,13 @@ function sinacin_mostrar_formulario() {
         const ajaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,nonceEmpresa=<?php echo wp_json_encode( wp_create_nonce( 'sinacin_validar_empresa' ) ); ?>;
         let empresaValida=false,rutValido=false,enviando=false,secuencia=0,temporizador=null,previewUrl=null;
         const bloqueados=Array.from(f.querySelectorAll('input:not(#rut_empresa):not([type="hidden"]),select'));
-        function normalizar(v){return v.replace(/[.\-\s]/g,'').toUpperCase()}
+         // Normalización visual: al salir del campo, sin interferir mientras escribe.
+         function normalizarTexto(v){return v.trim().replace(/\s+/g,' ').toLocaleLowerCase('es').replace(/(^|[\s'’\-])(\p{L})/gu,(_,sep,letra)=>sep+letra.toLocaleUpperCase('es'))}
+         const camposTexto=['nombres','apellido_paterno','apellido_materno','cargo'];
+         camposTexto.forEach(id=>{const campo=f.querySelector('#'+id);if(campo)campo.addEventListener('blur',()=>{campo.value=normalizarTexto(campo.value);actualizar()})});
+         const campoCorreo=f.querySelector('#correo');
+         if(campoCorreo)campoCorreo.addEventListener('blur',()=>{campoCorreo.value=campoCorreo.value.trim().toLowerCase();actualizar()});
+         function normalizar(v){return v.replace(/[.\-\s]/g,'').toUpperCase()}
         function validar(v){v=normalizar(v);if(!/^\d{1,8}[\dK]$/.test(v))return false;let suma=0,m=2;for(let i=v.length-2;i>=0;i--){suma+=Number(v[i])*m;m=m===7?2:m+1}const r=11-suma%11;return v.slice(-1)===(r===11?'0':r===10?'K':String(r))}
         function formato(v){v=normalizar(v);if(v.length<2)return v;return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+v.slice(-1)}
         function mensaje(texto,tipo){general.hidden=!texto;general.textContent=texto||'';general.dataset.tipo=tipo||'error'}
@@ -354,8 +360,10 @@ function sinacin_mostrar_formulario() {
         f.addEventListener('submit',async ev=>{
           ev.preventDefault();
           if(enviando||f.hidden)return;
-          mensaje('');telefono();
-          if(!empresaValida||!rutValido||!f.checkValidity()){
+           mensaje('');telefono();
+           camposTexto.forEach(id=>{const campo=f.querySelector('#'+id);if(campo)campo.value=normalizarTexto(campo.value)});
+           if(campoCorreo)campoCorreo.value=campoCorreo.value.trim().toLowerCase();
+           if(!empresaValida||!rutValido||!f.checkValidity()){
             f.reportValidity();mensaje('Revisa los campos obligatorios, el RUT de empresa y tu RUT.');return;
           }
           enviando=true;actualizar();boton.textContent='Enviando solicitud...';
@@ -549,6 +557,13 @@ function sinacin_procesar_solicitud() {
             )
             : '';
 
+
+    // Normalización definitiva del lado del servidor antes de validar y guardar.
+    $nombres          = sinacin_normalizar_texto_formulario( $nombres );
+    $apellido_paterno = sinacin_normalizar_texto_formulario( $apellido_paterno );
+    $apellido_materno = sinacin_normalizar_texto_formulario( $apellido_materno );
+    $cargo            = sinacin_normalizar_texto_formulario( $cargo );
+    $correo           = strtolower( trim( $correo ) );
 
     $faena_id = isset( $_POST['faena_id'] ) ? absint( $_POST['faena_id'] ) : 0;
 
@@ -1572,6 +1587,35 @@ function sinacin_procesar_solicitud() {
 
 }
 
+
+/**
+ * Normaliza nombres, apellidos y cargos a formato título.
+ * Conserva caracteres acentuados y separadores como guiones y apóstrofes.
+ * No intenta inferir excepciones ortográficas (p. ej., McDonald o siglas).
+ */
+function sinacin_normalizar_texto_formulario( $valor ) {
+    $valor = trim( preg_replace( '/\s+/u', ' ', $valor ) );
+
+    if ( function_exists( 'mb_convert_case' ) ) {
+        $valor = mb_convert_case( $valor, MB_CASE_TITLE, 'UTF-8' );
+    } else {
+        // Alternativa Unicode cuando la extensión mbstring no está disponible.
+        $minusculas = array(
+            'Á'=>'á', 'É'=>'é', 'Í'=>'í', 'Ó'=>'ó', 'Ú'=>'ú', 'Ü'=>'ü', 'Ñ'=>'ñ'
+        );
+        $mayusculas = array_flip( $minusculas );
+        $valor = strtr( strtolower( strtr( $valor, $minusculas ) ), array() );
+        $valor = preg_replace_callback(
+            '/(^|[\s\x{0027}\x{2019}-])(\p{L})/u',
+            static function ( $coincidencia ) use ( $mayusculas ) {
+                return $coincidencia[1] . strtr( strtoupper( $coincidencia[2] ), $mayusculas );
+            },
+            $valor
+        );
+    }
+
+    return $valor;
+}
 
 /**
  * ==========================================

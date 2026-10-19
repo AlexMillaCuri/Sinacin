@@ -736,6 +736,43 @@ function sinacin_generar_certificado( $afiliacion_id ) {
     }
 
     /**
+     * Auditar la emisión solo después de generar correctamente el PDF.
+     * El ID del evento apunta al certificado (no a la afiliación),
+     * permitiendo resolver el trabajador en Historial > Ver detalle.
+     */
+    $ip_emision = isset( $_SERVER['REMOTE_ADDR'] ) && is_string( $_SERVER['REMOTE_ADDR'] )
+        ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+        : '';
+    if ( ! filter_var( $ip_emision, FILTER_VALIDATE_IP ) ) {
+        $ip_emision = '';
+    }
+
+    $historial_insertado = $wpdb->insert(
+        $wpdb->prefix . 'sinacin_historial',
+        array(
+            'usuario_id'  => get_current_user_id() ?: null,
+            'entidad'     => 'CERTIFICADO',
+            'entidad_id'  => $certificado_id,
+            'accion'      => 'EMITIR',
+            'descripcion' => sprintf(
+                'Certificado %s emitido para %s (RUT %s). Afiliación #%d.',
+                $numero_certificado,
+                $nombre_completo,
+                $rut_persona,
+                $afiliacion_id
+            ),
+            'ip'          => $ip_emision,
+            'fecha'       => current_time( 'mysql' ),
+        ),
+        array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' )
+    );
+
+    if ( false === $historial_insertado ) {
+        // No ocultar ni invalidar un certificado que ya fue emitido.
+        error_log( 'SINACIN - No se pudo registrar en historial la emisión del certificado #' . $certificado_id );
+    }
+
+    /**
      * El registro de emisión queda en la base de datos.
      * archivo_id permanece NULL (no hay attachment permanente).
      */
