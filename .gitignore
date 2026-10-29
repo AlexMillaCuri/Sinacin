@@ -49,3 +49,7 @@ vendor/
 
 # Backups de base de datos
 *.sql
+
+
+#Así evitaremos subir accidentalmente las fotografías de cédulas a GitHub
+/sinacin-private/

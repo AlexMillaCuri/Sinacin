@@ -2549,10 +2549,12 @@ function sinacin_mostrar_detalle_solicitud(
 
                 <?php
 
-                $archivo_url =
-                    wp_get_attachment_url(
-                        $documento->archivo_id
-                    );
+                $archivo_url = ! empty( $documento->id )
+                    ? wp_nonce_url(
+                        admin_url( 'admin-post.php?action=sinacin_ver_cedula&documento_id=' . absint( $documento->id ) ),
+                        'sinacin_ver_cedula_' . absint( $documento->id )
+                    )
+                    : false;
 
                 ?>
 
@@ -2562,22 +2564,116 @@ function sinacin_mostrar_detalle_solicitud(
                 ) : ?>
 
                     <p>
-
-                        <a
-                            href="<?php
-                                echo esc_url(
-                                    $archivo_url
-                                );
-                            ?>"
-                            target="_blank"
-                            class="button"
-                        >
-
+                        <button type="button" class="button" id="sinacin-abrir-cedula"
+                            data-documento-url="<?php echo esc_url( $archivo_url ); ?>">
                             Ver documento
-
-                        </a>
-
+                        </button>
                     </p>
+
+                    <div id="sinacin-modal-cedula" class="sinacin-modal-cedula" role="dialog"
+                        aria-modal="true" aria-label="Visualizador de documento de identidad" hidden>
+                        <div class="sinacin-modal-cedula__panel" role="document">
+                            <div class="sinacin-modal-cedula__barra">
+                                <span>Documento de identidad</span>
+                                <div class="sinacin-modal-cedula__controles">
+                                    <button type="button" class="button" id="sinacin-zoom-menos" aria-label="Reducir zoom">−</button>
+                                    <span id="sinacin-zoom-valor" aria-live="polite">100%</span>
+                                    <button type="button" class="button" id="sinacin-zoom-mas" aria-label="Aumentar zoom">+</button>
+                                    <button type="button" class="button" id="sinacin-cerrar-cedula" aria-label="Cerrar visor">Cerrar ×</button>
+                                </div>
+                            </div>
+                            <div class="sinacin-modal-cedula__imagen-wrap" id="sinacin-cedula-contenedor">
+                                <img id="sinacin-cedula-imagen" alt="Fotografía del documento de identidad" hidden>
+                                <p id="sinacin-cedula-estado" role="status">Cargando documento…</p>
+                            </div>
+                        </div>
+                    </div>
+                    <style>
+                        .sinacin-modal-cedula[hidden], .sinacin-modal-cedula__imagen-wrap img[hidden] { display:none !important; }
+                        .sinacin-modal-cedula { position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,.83); display:flex; align-items:center; justify-content:center; padding:18px; box-sizing:border-box; }
+                        .sinacin-modal-cedula__panel { width:min(1100px,100%); height:min(850px,94vh); background:#171b20; border-radius:9px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 16px 55px rgba(0,0,0,.5); }
+                        .sinacin-modal-cedula__barra { color:white; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 16px; flex-wrap:wrap; }
+                        .sinacin-modal-cedula__controles { display:flex; align-items:center; gap:8px; }
+                        .sinacin-modal-cedula__controles .button { min-width:36px; }
+                        .sinacin-modal-cedula__imagen-wrap { flex:1; min-height:0; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:20px; box-sizing:border-box; color:white; }
+                        .sinacin-modal-cedula__imagen-wrap img { display:block; width:auto; height:auto; max-width:none; max-height:none; object-fit:contain; flex-shrink:0; }
+                        @media(max-width:600px) { .sinacin-modal-cedula { padding:8px; } .sinacin-modal-cedula__barra { padding:10px; } }
+                    </style>
+                    <script>
+                    (function () {
+                        'use strict';
+                        const abrir = document.getElementById('sinacin-abrir-cedula');
+                        const modal = document.getElementById('sinacin-modal-cedula');
+                        const imagen = document.getElementById('sinacin-cedula-imagen');
+                        const estado = document.getElementById('sinacin-cedula-estado');
+                        const contenedor = document.getElementById('sinacin-cedula-contenedor');
+                        const valor = document.getElementById('sinacin-zoom-valor');
+                        const cerrar = document.getElementById('sinacin-cerrar-cedula');
+                        if (!abrir || !modal || !imagen || !cerrar) return;
+                        let zoom = 1;
+                        let focoAnterior = null;
+                        let overflowAnterior = '';
+                        function actualizarZoom() {
+                            valor.textContent = Math.round(zoom * 100) + '%';
+                            if (!imagen.naturalWidth) return;
+                            const base = Math.min(1, (contenedor.clientWidth - 40) / imagen.naturalWidth,
+                                (contenedor.clientHeight - 40) / imagen.naturalHeight);
+                            imagen.style.width = Math.max(1, Math.round(imagen.naturalWidth * Math.max(.05, base) * zoom)) + 'px';
+                            imagen.style.height = 'auto';
+                        }
+                        function cerrarModal() {
+                            modal.hidden = true;
+                            imagen.removeAttribute('src');
+                            imagen.hidden = true;
+                            overflowAnterior !== null && (document.body.style.overflow = overflowAnterior);
+                            if (focoAnterior) focoAnterior.focus();
+                        }
+                        abrir.addEventListener('click', function () {
+                            focoAnterior = document.activeElement;
+                            overflowAnterior = document.body.style.overflow;
+                            document.body.style.overflow = 'hidden';
+                            zoom = 1;
+                            valor.textContent = '100%';
+                            estado.hidden = false;
+                            estado.textContent = 'Cargando documento…';
+                            imagen.hidden = true;
+                            modal.hidden = false;
+                            cerrar.focus();
+                            imagen.src = abrir.dataset.documentoUrl;
+                        });
+                        imagen.addEventListener('load', function () {
+                            if (modal.hidden) return;
+                            estado.hidden = true;
+                            imagen.hidden = false;
+                            actualizarZoom();
+                        });
+                        imagen.addEventListener('error', function () {
+                            if (modal.hidden) return;
+                            imagen.hidden = true;
+                            estado.hidden = false;
+                            estado.textContent = 'No fue posible cargar el documento. Comprueba tu sesión y permisos.';
+                        });
+                        document.getElementById('sinacin-zoom-mas').addEventListener('click', function () {
+                            zoom = Math.min(5, Math.round((zoom + .25) * 100) / 100); actualizarZoom();
+                        });
+                        document.getElementById('sinacin-zoom-menos').addEventListener('click', function () {
+                            zoom = Math.max(.25, Math.round((zoom - .25) * 100) / 100); actualizarZoom();
+                        });
+                        cerrar.addEventListener('click', cerrarModal);
+                        modal.addEventListener('click', function (event) { if (event.target === modal) cerrarModal(); });
+                        document.addEventListener('keydown', function (event) {
+                            if (modal.hidden) return;
+                            if (event.key === 'Escape') { event.preventDefault(); cerrarModal(); }
+                            if (event.key === 'Tab') {
+                                const controles = Array.from(modal.querySelectorAll('button'));
+                                const primero = controles[0], ultimo = controles[controles.length - 1];
+                                if (event.shiftKey && document.activeElement === primero) { event.preventDefault(); ultimo.focus(); }
+                                else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primero.focus(); }
+                            }
+                        });
+                        window.addEventListener('resize', function () { if (!modal.hidden) actualizarZoom(); });
+                    }());
+                    </script>
 
                 <?php else : ?>
 

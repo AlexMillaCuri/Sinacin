@@ -19,10 +19,12 @@ services:
       SINACIN_SMTP_PASSWORD: ${SINACIN_SMTP_PASSWORD}
       SINACIN_SMTP_FROM: ${SINACIN_SMTP_FROM}
       SINACIN_SMTP_FROM_NAME: ${SINACIN_SMTP_FROM_NAME}
+      SINACIN_PRIVATE_DIR: /var/sinacin-private
 
     volumes:
     - ./wordpress:/var/www/html
     - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    - ./sinacin-private:/var/sinacin-private
 
     depends_on:
       - db

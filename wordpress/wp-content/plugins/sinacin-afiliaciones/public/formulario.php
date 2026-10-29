@@ -1007,152 +1007,35 @@ function sinacin_procesar_solicitud() {
 
 
     /**
-     * ------------------------------------------
-     * CARGAR FUNCIONES WORDPRESS
-     * ------------------------------------------
+     * Guardar la cédula fuera del directorio público.
+     * No generar tamaños derivados ni URLs de la biblioteca multimedia.
      */
+    $directorio_privado = sinacin_directorio_cedulas_privadas();
+    if ( is_wp_error( $directorio_privado ) ) {
+        sinacin_respuesta_error( 'No se pudo configurar el almacenamiento privado de documentos. Contacta al administrador.' );
+    }
 
-    require_once ABSPATH .
-        'wp-admin/includes/file.php';
+    $extensiones = array( 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp' );
+    $ruta_privada = trailingslashit( $directorio_privado ) . wp_generate_uuid4() . '.' . $extensiones[ $mime ];
+    if ( ! is_uploaded_file( $archivo['tmp_name'] ) || ! move_uploaded_file( $archivo['tmp_name'], $ruta_privada ) ) {
+        sinacin_respuesta_error( 'No fue posible guardar la fotografía de la cédula.' );
+    }
+    @chmod( $ruta_privada, 0600 );
 
-
-    require_once ABSPATH .
-        'wp-admin/includes/media.php';
-
-
-    require_once ABSPATH .
-        'wp-admin/includes/image.php';
-
-
-    /**
-     * ------------------------------------------
-     * SUBIR ARCHIVO
-     * ------------------------------------------
-     */
-
-    $upload_overrides =
+    $attachment_id = wp_insert_attachment(
         array(
-            'test_form' => false,
-
-            'mimes' =>
-                array(
-                    'jpg|jpeg|jpe' =>
-                        'image/jpeg',
-
-                    'png' =>
-                        'image/png',
-
-                    'webp' =>
-                        'image/webp',
-                ),
-        );
-
-
-    $archivo_subido =
-        wp_handle_upload(
-            $archivo,
-            $upload_overrides
-        );
-
-
-    if (
-        isset(
-            $archivo_subido['error']
-        )
-    ) {
-
-        sinacin_respuesta_error(
-            'No fue posible guardar la fotografía de la cédula.'
-        );
-
+            'post_mime_type' => $mime,
+            'post_title'     => 'Documento de identidad SINACIN',
+            'post_content'   => '',
+            'post_status'    => 'private',
+        ),
+        $ruta_privada
+    );
+    if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
+        @unlink( $ruta_privada );
+        sinacin_respuesta_error( 'No fue posible registrar la fotografía de la cédula.' );
     }
-
-
-    /**
-     * ------------------------------------------
-     * CREAR ATTACHMENT
-     * ------------------------------------------
-     */
-
-    $attachment =
-        array(
-            'post_mime_type' =>
-                $archivo_subido['type'],
-
-            'post_title' =>
-                sanitize_file_name(
-                    pathinfo(
-                        $archivo['name'],
-                        PATHINFO_FILENAME
-                    )
-                ),
-
-            'post_content' => '',
-
-            'post_status' =>
-                'inherit',
-        );
-
-
-    $attachment_id =
-        wp_insert_attachment(
-            $attachment,
-            $archivo_subido['file']
-        );
-
-
-    if (
-        is_wp_error(
-            $attachment_id
-        )
-    ) {
-
-        if (
-            file_exists(
-                $archivo_subido['file']
-            )
-        ) {
-
-            @unlink(
-                $archivo_subido['file']
-            );
-
-        }
-
-
-        sinacin_respuesta_error(
-            'No fue posible registrar la fotografía de la cédula.'
-        );
-
-    }
-
-
-    /**
-     * ------------------------------------------
-     * GENERAR METADATA
-     * ------------------------------------------
-     */
-
-    $attachment_metadata =
-        wp_generate_attachment_metadata(
-            $attachment_id,
-            $archivo_subido['file']
-        );
-
-
-    if (
-        ! empty(
-            $attachment_metadata
-        )
-    ) {
-
-        wp_update_attachment_metadata(
-            $attachment_id,
-            $attachment_metadata
-        );
-
-    }
-
+    update_post_meta( $attachment_id, '_sinacin_documento_privado', '1' );
 
     /**
      * ------------------------------------------
@@ -1575,6 +1458,12 @@ function sinacin_procesar_solicitud() {
                 $attachment_id,
                 true
             );
+            if ( isset( $ruta_privada ) && is_file( $ruta_privada ) ) {
+                @unlink( $ruta_privada );
+            }
+            if ( ! empty( $ruta_privada ) && is_file( $ruta_privada ) ) {
+                @unlink( $ruta_privada );
+            }
 
         }
 
@@ -1587,6 +1476,96 @@ function sinacin_procesar_solicitud() {
 
 }
 
+
+/**
+ * Directorio privado. Por defecto se sitúa un nivel sobre el DOCUMENT_ROOT.
+ * Se utiliza SINACIN_PRIVATE_DIR desde Docker o wp-config.php.
+ * Si no puede comprobarse que queda fuera de la web, se rechaza la subida.
+ */
+function sinacin_directorio_cedulas_privadas() {
+    $raiz_publica = isset( $_SERVER['DOCUMENT_ROOT'] ) ? realpath( $_SERVER['DOCUMENT_ROOT'] ) : false;
+    if ( ! $raiz_publica ) {
+        return new WP_Error( 'sinacin_sin_docroot' );
+    }
+    $configurado = defined( 'SINACIN_PRIVATE_DIR' ) ? SINACIN_PRIVATE_DIR : getenv( 'SINACIN_PRIVATE_DIR' );
+    $destino = is_string( $configurado ) && trim( $configurado ) !== ''
+        ? $configurado
+        : dirname( $raiz_publica ) . '/sinacin-documentos-privados';
+    if ( ! is_dir( $destino ) && ! wp_mkdir_p( $destino ) ) {
+        return new WP_Error( 'sinacin_directorio_no_disponible' );
+    }
+    $ruta = realpath( $destino );
+    $raiz = rtrim( $raiz_publica, DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR;
+    if ( ! $ruta || $ruta === $raiz_publica || strncmp( $ruta . DIRECTORY_SEPARATOR, $raiz, strlen( $raiz ) ) === 0 || ! is_writable( $ruta ) ) {
+        return new WP_Error( 'sinacin_directorio_inseguro' );
+    }
+    @chmod( $ruta, 0700 );
+    return $ruta;
+}
+
+/**
+ * No entregar URL pública para attachments privados de SINACIN.
+ */
+add_filter( 'wp_get_attachment_url', 'sinacin_ocultar_url_cedula_privada', 10, 2 );
+function sinacin_ocultar_url_cedula_privada( $url, $attachment_id ) {
+    if ( get_post_meta( $attachment_id, '_sinacin_documento_privado', true ) === '1' ) {
+        return false;
+    }
+    return $url;
+}
+
+/**
+ * Endpoint de descarga para administradores y gestores autorizados.
+ */
+add_action( 'admin_post_sinacin_ver_cedula', 'sinacin_entregar_cedula_privada' );
+function sinacin_entregar_cedula_privada() {
+    if ( ! is_user_logged_in() || ! current_user_can( 'sinacin_gestionar_afiliaciones' ) ) {
+        wp_die( 'Acceso denegado.', '', array( 'response' => 403 ) );
+    }
+    $documento_id = isset( $_GET['documento_id'] ) ? absint( $_GET['documento_id'] ) : 0;
+    if ( ! $documento_id || ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'sinacin_ver_cedula_' . $documento_id ) ) {
+        wp_die( 'Solicitud no autorizada.', '', array( 'response' => 403 ) );
+    }
+    global $wpdb;
+    $tabla = $wpdb->prefix . 'sinacin_documentos';
+    $documento = $wpdb->get_row( $wpdb->prepare(
+        "SELECT archivo_id FROM {$tabla} WHERE id = %d AND tipo_documento = %s LIMIT 1",
+        $documento_id, 'CEDULA_IDENTIDAD'
+    ) );
+    if ( ! $documento ) {
+        wp_die( 'Documento no encontrado.', '', array( 'response' => 404 ) );
+    }
+    $attachment_id = (int) $documento->archivo_id;
+    $ruta = get_attached_file( $attachment_id );
+    if ( ! $ruta || ! is_file( $ruta ) || ! is_readable( $ruta ) ) {
+        wp_die( 'Archivo no disponible.', '', array( 'response' => 404 ) );
+    }
+    $mime = get_post_mime_type( $attachment_id );
+    if ( ! in_array( $mime, array( 'image/jpeg', 'image/png', 'image/webp' ), true ) ) {
+        wp_die( 'Tipo de documento no permitido.', '', array( 'response' => 403 ) );
+    }
+    // Nunca entregar cédulas desde ubicaciones públicas ni adjuntos sin marca privada.
+    if ( get_post_meta( $attachment_id, '_sinacin_documento_privado', true ) !== '1' ) {
+        wp_die( 'El documento no está en el almacén privado.', '', array( 'response' => 403 ) );
+    }
+    {
+        $directorio = sinacin_directorio_cedulas_privadas();
+        $real = realpath( $ruta );
+        if ( is_wp_error( $directorio ) || ! $real || strpos( $real, trailingslashit( $directorio ) ) !== 0 ) {
+            wp_die( 'Ubicación de documento no autorizada.', '', array( 'response' => 403 ) );
+        }
+    }
+    while ( ob_get_level() ) { ob_end_clean(); }
+    nocache_headers();
+    header( 'Content-Type: ' . $mime );
+    header( 'Content-Disposition: inline; filename="cedula-sinacin.' . ( $mime === 'image/png' ? 'png' : ( $mime === 'image/webp' ? 'webp' : 'jpg' ) ) . '"' );
+    header( 'X-Content-Type-Options: nosniff' );
+    header( 'X-Frame-Options: SAMEORIGIN' );
+    header( 'Content-Security-Policy: default-src \'none\'; sandbox' );
+    header( 'Content-Length: ' . filesize( $ruta ) );
+    readfile( $ruta );
+    exit;
+}
 
 /**
  * Normaliza nombres, apellidos y cargos a formato título.
