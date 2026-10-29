@@ -1,3 +1,4 @@
+
 # ==========================================
 # IGNORAR TODO EL CONTENIDO DE WORDPRESS
 # ==========================================
@@ -6,14 +7,26 @@
 
 
 # ==========================================
-# PERMITIR SOLO EL PLUGIN SINACIN-AFILIACIONES
+# PERMITIR EL PLUGIN SINACIN-AFILIACIONES
 # ==========================================
 
-!/wordpress/wp-content
+!/wordpress/wp-content/
 /wordpress/wp-content/*
-!/wordpress/wp-content/plugins
+
+!/wordpress/wp-content/plugins/
 /wordpress/wp-content/plugins/*
-!/wordpress/wp-content/plugins/sinacin-afiliaciones
+
+!/wordpress/wp-content/plugins/sinacin-afiliaciones/
+
+
+# ==========================================
+# PERMITIR EL TEMA SINACIN-INSTITUCIONAL
+# ==========================================
+
+!/wordpress/wp-content/themes/
+/wordpress/wp-content/themes/*
+
+!/wordpress/wp-content/themes/sinacin-institucional/
 
 
 # ==========================================
@@ -51,5 +64,8 @@ vendor/
 *.sql
 
 
-#Así evitaremos subir accidentalmente las fotografías de cédulas a GitHub
-/sinacin-private/
+# ==========================================
+# ARCHIVOS PRIVADOS
+# ==========================================
+
+sinacin-private/
