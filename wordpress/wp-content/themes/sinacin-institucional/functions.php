@@ -28,15 +28,19 @@ function sinacin_tema_configuracion() {
 add_action('after_setup_theme', 'sinacin_tema_configuracion');
 
 function sinacin_tema_estilos() {
+
+    $archivo_css = get_stylesheet_directory() . '/style.css';
+
     wp_enqueue_style(
         'sinacin-estilos',
         get_stylesheet_uri(),
         array(),
-        wp_get_theme()->get('Version')
+        filemtime($archivo_css)
     );
-}
-add_action('wp_enqueue_scripts', 'sinacin_tema_estilos');
 
+}
+
+add_action('wp_enqueue_scripts', 'sinacin_tema_estilos');
 
 function sinacin_tema_scripts() {
     wp_enqueue_script(
@@ -275,3 +279,302 @@ function sinacin_cargar_iconos_redes() {
 }
 
 add_action('wp_enqueue_scripts', 'sinacin_cargar_iconos_redes');
+
+
+/* ==========================================
+   SINACIN - ADMINISTRACIÓN DE HITOS
+========================================== */
+
+/**
+ * 1. Registrar el tipo de contenido Hitos SINACIN.
+ */
+function sinacin_registrar_hitos() {
+
+    register_post_type('sinacin_hito', array(
+        'labels' => array(
+            'name'          => 'Hitos SINACIN',
+            'singular_name' => 'Hito',
+            'menu_name'     => 'Hitos SINACIN',
+            'add_new'       => 'Agregar hito',
+            'add_new_item'  => 'Agregar nuevo hito',
+            'edit_item'     => 'Editar hito',
+            'all_items'     => 'Todos los hitos',
+            'not_found'     => 'No se encontraron hitos'
+        ),
+        'public'        => false,
+        'show_ui'       => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'menu_icon'     => 'dashicons-calendar-alt',
+        'menu_position' => 6,
+        'supports'      => array(
+            'title',
+            'editor',
+            'thumbnail'
+        ),
+        'has_archive'   => false,
+        'rewrite'       => false
+    ));
+}
+
+add_action('init', 'sinacin_registrar_hitos');
+
+
+/* ==========================================
+   2. CAMPO FECHA DEL ACONTECIMIENTO
+========================================== */
+
+/**
+ * Registrar el recuadro de fecha.
+ * Se muestra en el editor de Hitos SINACIN.
+ */
+function sinacin_hitos_metabox() {
+
+    add_meta_box(
+        'sinacin_hito_fecha_box',
+        'Fecha del acontecimiento',
+        'sinacin_hitos_metabox_html',
+        'sinacin_hito',
+        'side',
+        'high',
+        array(
+            '__back_compat_meta_box' => false
+        )
+    );
+}
+
+add_action('add_meta_boxes_sinacin_hito', 'sinacin_hitos_metabox');
+
+
+/**
+ * Mostrar el selector de fecha.
+ */
+function sinacin_hitos_metabox_html($post) {
+
+    wp_nonce_field(
+        'sinacin_guardar_hito',
+        'sinacin_hito_nonce'
+    );
+
+    $fecha = get_post_meta(
+        $post->ID,
+        '_sinacin_hito_fecha',
+        true
+    );
+
+    $anio_anterior = get_post_meta(
+        $post->ID,
+        '_sinacin_hito_anio',
+        true
+    );
+
+    ?>
+
+    <p>
+        <label for="sinacin_hito_fecha">
+            <strong>¿Cuándo ocurrió este hito?</strong>
+        </label>
+    </p>
+
+    <p>
+        <input
+            type="date"
+            id="sinacin_hito_fecha"
+            name="sinacin_hito_fecha"
+            value="<?php echo esc_attr($fecha); ?>"
+            style="width:100%;"
+        >
+    </p>
+
+    <p class="description">
+        Selecciona el día, mes y año.
+        El sistema obtendrá automáticamente el año
+        para agrupar los hitos.
+    </p>
+
+    <?php if (empty($fecha) && !empty($anio_anterior)) : ?>
+
+        <p>
+            <strong>Año registrado anteriormente:</strong>
+            <?php echo esc_html($anio_anterior); ?>
+        </p>
+
+        <p class="description">
+            Selecciona la fecha completa para actualizar
+            este hito.
+        </p>
+
+    <?php endif; ?>
+
+    <?php
+}
+
+
+/* ==========================================
+   3. GUARDAR FECHA Y AÑO
+========================================== */
+
+function sinacin_guardar_hito_datos($post_id) {
+
+    // Verificar seguridad.
+    if (
+        !isset($_POST['sinacin_hito_nonce']) ||
+        !wp_verify_nonce(
+            sanitize_text_field(
+                wp_unslash($_POST['sinacin_hito_nonce'])
+            ),
+            'sinacin_guardar_hito'
+        )
+    ) {
+        return;
+    }
+
+    // Evitar autoguardados.
+    if (
+        defined('DOING_AUTOSAVE') &&
+        DOING_AUTOSAVE
+    ) {
+        return;
+    }
+
+    // Verificar permisos.
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    if (get_post_type($post_id) !== 'sinacin_hito') {
+        return;
+    }
+
+    if (!isset($_POST['sinacin_hito_fecha'])) {
+        return;
+    }
+
+    $fecha = sanitize_text_field(
+        wp_unslash($_POST['sinacin_hito_fecha'])
+    );
+
+    // Validar fecha real.
+    $fecha_objeto = DateTimeImmutable::createFromFormat(
+        '!Y-m-d',
+        $fecha
+    );
+
+    if (
+        $fecha_objeto &&
+        $fecha_objeto->format('Y-m-d') === $fecha
+    ) {
+
+        $anio = $fecha_objeto->format('Y');
+
+        update_post_meta(
+            $post_id,
+            '_sinacin_hito_fecha',
+            $fecha
+        );
+
+        update_post_meta(
+            $post_id,
+            '_sinacin_hito_anio',
+            $anio
+        );
+
+    } elseif ($fecha === '') {
+
+        delete_post_meta(
+            $post_id,
+            '_sinacin_hito_fecha'
+        );
+
+        delete_post_meta(
+            $post_id,
+            '_sinacin_hito_anio'
+        );
+    }
+}
+
+add_action(
+    'save_post_sinacin_hito',
+    'sinacin_guardar_hito_datos'
+);
+
+
+/* ==========================================
+   4. MOSTRAR FECHA EN ADMINISTRACIÓN
+========================================== */
+
+/**
+ * Agregar columna Fecha del hito.
+ */
+function sinacin_hitos_columnas($columnas) {
+
+    $nuevas = array();
+
+    foreach ($columnas as $clave => $titulo) {
+
+        if ($clave === 'date') {
+            continue;
+        }
+
+        $nuevas[$clave] = $titulo;
+
+        if ($clave === 'title') {
+            $nuevas['fecha_hito'] = 'Fecha del hito';
+        }
+    }
+
+    return $nuevas;
+}
+
+add_filter(
+    'manage_sinacin_hito_posts_columns',
+    'sinacin_hitos_columnas'
+);
+
+
+/**
+ * Mostrar la fecha de cada acontecimiento.
+ */
+function sinacin_hitos_columna_fecha($columna, $post_id) {
+
+    if ($columna !== 'fecha_hito') {
+        return;
+    }
+
+    $fecha = get_post_meta(
+        $post_id,
+        '_sinacin_hito_fecha',
+        true
+    );
+
+    if (!empty($fecha)) {
+
+        $timestamp = strtotime($fecha . ' 12:00:00');
+
+        echo esc_html(
+            wp_date(
+                'd/m/Y',
+                $timestamp
+            )
+        );
+
+    } else {
+
+        $anio = get_post_meta(
+            $post_id,
+            '_sinacin_hito_anio',
+            true
+        );
+
+        echo $anio
+            ? esc_html($anio . ' (sin fecha completa)')
+            : 'Sin fecha';
+    }
+}
+
+add_action(
+    'manage_sinacin_hito_posts_custom_column',
+    'sinacin_hitos_columna_fecha',
+    10,
+    2
+);
