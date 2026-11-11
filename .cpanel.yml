@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - export PLUGINPATH=/home/sinacinc/public_html/wp-content/plugins/sinacin-afiliaciones/
+    - /bin/mkdir -p "$PLUGINPATH"
+    - /bin/cp -R wordpress/wp-content/plugins/sinacin-afiliaciones/. "$PLUGINPATH"
+
+    - export THEMEPATH=/home/sinacinc/public_html/wp-content/themes/sinacin-institucional/
+    - /bin/mkdir -p "$THEMEPATH"
+    - /bin/cp -R wordpress/wp-content/themes/sinacin-institucional/. "$THEMEPATH"
