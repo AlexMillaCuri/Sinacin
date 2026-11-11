@@ -1844,7 +1844,7 @@ a:hover {
 /* FOTOGRAFÍAS */
 
 .sinacin-directorio-foto {
-    height: 175px;
+    height: 250px;
     overflow: hidden;
     background: #e6e8ec;
 }
@@ -2634,3 +2634,1138 @@ a:hover {
         width: 42%;
     }
 }
+
+
+
+/* ==========================================
+   SINACIN - PÁGINA CONTACTO
+   DISEÑO INSTITUCIONAL COMPLETO
+========================================== */
+
+/* VARIABLES Y CONFIGURACIÓN */
+
+.sinacin-contacto {
+    --contacto-rojo: #B30820;
+    --contacto-rojo-vivo: #ed0016;
+    --contacto-texto: #171923;
+    --contacto-secundario: #667085;
+    --contacto-borde: #e8ebef;
+
+    background: #f8f9fb;
+    color: var(--contacto-texto);
+    padding: 40px 0 70px;
+    min-height: 70vh;
+}
+
+.sinacin-contacto *,
+.sinacin-contacto *::before,
+.sinacin-contacto *::after {
+    box-sizing: border-box;
+}
+
+.sinacin-contacto > .container {
+    width: min(1400px, 92%);
+    max-width: 1400px;
+}
+
+/* ==========================================
+   1. ENCABEZADO PRINCIPAL
+========================================== */
+
+.sinacin-contacto-encabezado {
+    text-align: center;
+    margin: 0 auto 42px;
+}
+
+.sinacin-contacto .sinacin-contacto-titulo-principal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+
+    margin: 0 0 10px;
+    color: #24252b;
+
+    font-size: clamp(30px, 3.5vw, 40px);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+}
+
+.sinacin-contacto-titulo-principal::before,
+.sinacin-contacto-titulo-principal::after {
+    content: "";
+    display: block;
+    flex: 0 0 65px;
+    height: 3px;
+    background: var(--contacto-rojo);
+    border-radius: 10px;
+}
+
+.sinacin-contacto-encabezado p {
+    margin: 0;
+    color: #737985;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* ==========================================
+   2. DISTRIBUCIÓN PRINCIPAL
+========================================== */
+
+.sinacin-contacto-layout {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.55fr)
+        minmax(0, 1fr);
+    gap: 26px;
+    align-items: stretch;
+}
+
+.sinacin-contacto-lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+}
+
+/* ==========================================
+   3. TARJETAS BLANCAS
+========================================== */
+
+.sinacin-contacto-panel {
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid var(--contacto-borde);
+    border-radius: 16px;
+    padding: 30px 34px;
+
+    box-shadow:
+        0 7px 25px rgba(25, 30, 40, 0.065);
+}
+
+.sinacin-contacto-formulario {
+    min-width: 0;
+}
+
+.sinacin-contacto-lateral
+.sinacin-contacto-panel:first-child {
+    flex: 1;
+}
+
+/* ==========================================
+   4. TÍTULOS DE LOS PANELES
+========================================== */
+
+.sinacin-contacto-titulo {
+    margin-bottom: 26px;
+}
+
+.sinacin-contacto-titulo h1,
+.sinacin-contacto-titulo h2 {
+    margin: 0;
+    color: var(--contacto-texto);
+
+    font-size: clamp(22px, 2.1vw, 27px);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.5px;
+}
+
+.sinacin-contacto-linea {
+    display: block;
+    width: 62px;
+    height: 4px;
+    margin-top: 16px;
+    background: var(--contacto-rojo-vivo);
+    border-radius: 8px;
+}
+
+/* ==========================================
+   5. FORMULARIO
+========================================== */
+
+.sinacin-contacto-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.sinacin-contacto-campos-dobles {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.sinacin-contacto-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.sinacin-contacto-campo label {
+    color: #171923;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.sinacin-contacto-campo label span {
+    color: var(--contacto-rojo-vivo);
+}
+
+/* INPUTS, SELECT Y TEXTAREA */
+
+.sinacin-contacto-campo input,
+.sinacin-contacto-campo select,
+.sinacin-contacto-campo textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    padding: 12px 14px;
+
+    background: #ffffff;
+    border: 1px solid #c9cdd5;
+    border-radius: 8px;
+
+    color: #222938;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+
+    outline: none;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.sinacin-contacto-campo input,
+.sinacin-contacto-campo select {
+    height: 48px;
+}
+
+.sinacin-contacto-campo select {
+    cursor: pointer;
+}
+
+.sinacin-contacto-campo textarea {
+    min-height: 165px;
+    resize: vertical;
+}
+
+.sinacin-contacto-campo input::placeholder,
+.sinacin-contacto-campo textarea::placeholder {
+    color: #81899a;
+    opacity: 1;
+}
+
+/* ESTADO DE ENFOQUE */
+
+.sinacin-contacto-campo input:focus,
+.sinacin-contacto-campo select:focus,
+.sinacin-contacto-campo textarea:focus {
+    border-color: var(--contacto-rojo);
+    box-shadow:
+        0 0 0 3px rgba(179, 8, 32, 0.10);
+}
+
+/* ==========================================
+   6. PIE DEL FORMULARIO
+========================================== */
+
+.sinacin-contacto-form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-top: 2px;
+}
+
+.sinacin-contacto-form-footer p {
+    margin: 0;
+    color: #6e7686;
+    font-size: 13px;
+}
+
+/* BOTÓN ENVIAR */
+
+.sinacin-contacto-enviar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+
+    min-height: 50px;
+    padding: 13px 26px;
+
+    background: var(--contacto-rojo-vivo);
+    color: #ffffff;
+
+    border: none;
+    border-radius: 9px;
+
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 750;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 4px 12px rgba(237, 0, 22, 0.12);
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+.sinacin-contacto-enviar span {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.sinacin-contacto-enviar:hover:not(:disabled) {
+    background: var(--contacto-rojo);
+    transform: translateY(-2px);
+}
+
+.sinacin-contacto-enviar:focus-visible {
+    outline: 3px solid rgba(179, 8, 32, 0.3);
+    outline-offset: 3px;
+}
+
+/* El envío aún no está habilitado */
+
+.sinacin-contacto-enviar:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ==========================================
+   7. MENSAJES DEL FORMULARIO
+========================================== */
+
+.sinacin-contacto-resultado {
+    padding: 13px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.sinacin-contacto-resultado[hidden] {
+    display: none;
+}
+
+.sinacin-contacto-resultado.exito {
+    background: #e9f8ee;
+    border: 1px solid #a8dfb7;
+    color: #176534;
+}
+
+.sinacin-contacto-resultado.error {
+    background: #fff0f0;
+    border: 1px solid #f0b1b1;
+    color: #9f1725;
+}
+
+/* ==========================================
+   8. INFORMACIÓN DE CONTACTO
+========================================== */
+
+.sinacin-contacto-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 23px;
+}
+
+.sinacin-contacto-dato {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    min-width: 0;
+}
+
+.sinacin-contacto-dato-icono {
+    flex: 0 0 50px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 50px;
+    height: 50px;
+
+    background: #f5f6f8;
+    color: var(--contacto-rojo-vivo);
+
+    border-radius: 50%;
+}
+
+.sinacin-contacto-dato-icono span {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* Compatible con SVG si luego cambiamos los iconos */
+
+.sinacin-contacto-dato-icono svg {
+    display: block;
+    width: 24px;
+    height: 24px;
+}
+
+.sinacin-contacto-dato h3 {
+    margin: 0 0 4px;
+
+    color: #171923;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.sinacin-contacto-dato p {
+    margin: 0;
+
+    color: #40495a;
+    font-size: 15px;
+    line-height: 1.5;
+
+    overflow-wrap: anywhere;
+}
+
+/* ==========================================
+   9. REDES SOCIALES
+========================================== */
+
+.sinacin-contacto-redes {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.sinacin-contacto-red {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+
+    border-radius: 50%;
+
+    color: #ffffff;
+    font-size: 25px;
+    font-weight: 800;
+    line-height: 1;
+
+    text-decoration: none;
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.sinacin-contacto-red svg {
+    display: block;
+    width: 25px;
+    height: 25px;
+    fill: currentColor;
+}
+
+.sinacin-red-facebook svg,
+.sinacin-red-youtube svg {
+    width: 27px;
+    height: 27px;
+}
+
+/* COLORES DE REDES */
+
+.sinacin-red-x {
+    background: #111111;
+}
+
+.sinacin-red-instagram {
+    background: linear-gradient(
+        35deg,
+        #ffbe28,
+        #f00065,
+        #8b00d6
+    );
+}
+
+.sinacin-red-youtube {
+    background: #f00014;
+}
+
+.sinacin-red-facebook {
+    background: #0866ff;
+}
+
+.sinacin-red-telegram {
+    background: #149bda;
+}
+
+/* INTERACCIONES */
+
+a.sinacin-contacto-red:hover {
+    transform: translateY(-4px);
+    color: #ffffff;
+    box-shadow:
+        0 7px 15px rgba(0, 0, 0, 0.15);
+}
+
+a.sinacin-contacto-red:focus-visible {
+    outline: 3px solid var(--contacto-rojo);
+    outline-offset: 4px;
+}
+
+/* ==========================================
+   10. SECCIÓN NUESTRA UBICACIÓN
+========================================== */
+
+.sinacin-contacto-ubicacion {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 65fr)
+        minmax(0, 35fr);
+
+    min-height: 310px;
+    margin-top: 35px;
+
+    background: #ffffff;
+    border: 1px solid #e3e6eb;
+    border-radius: 24px;
+
+    overflow: hidden;
+
+    box-shadow:
+        0 5px 20px rgba(30, 35, 45, 0.025);
+}
+
+/* ==========================================
+   11. MAPA
+========================================== */
+
+.sinacin-contacto-mapa {
+    position: relative;
+    min-width: 0;
+    min-height: 310px;
+    background: #e7edf2;
+}
+
+.sinacin-contacto-mapa iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 310px;
+    border: 0;
+}
+
+/* MAPA PENDIENTE */
+
+.sinacin-contacto-mapa-pendiente {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    width: 100%;
+    height: 100%;
+    min-height: 310px;
+
+    padding: 25px;
+    text-align: center;
+
+    background: linear-gradient(
+        135deg,
+        #dbeef7,
+        #f0f2f4
+    );
+}
+
+.sinacin-contacto-mapa-pendiente > span {
+    color: var(--contacto-rojo);
+    font-size: 55px;
+    line-height: 1;
+}
+
+.sinacin-contacto-mapa-pendiente p {
+    margin: 0;
+    color: #283342;
+    font-size: 17px;
+    font-weight: 750;
+}
+
+.sinacin-contacto-mapa-pendiente small {
+    color: #657082;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* ==========================================
+   12. INFORMACIÓN DE UBICACIÓN
+========================================== */
+
+.sinacin-contacto-ubicacion-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+
+    min-width: 0;
+    padding: 35px 42px;
+}
+
+.sinacin-contacto-ubicacion-info
+.sinacin-contacto-titulo {
+    margin-bottom: 16px;
+}
+
+.sinacin-contacto-ubicacion-info > p {
+    margin: 0 0 25px;
+
+    color: #41495a;
+    font-size: 17px;
+    line-height: 1.55;
+}
+
+/* BOTÓN GOOGLE MAPS */
+
+.sinacin-contacto-maps-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    min-height: 45px;
+    padding: 10px 19px;
+
+    background: #ffffff;
+    color: var(--contacto-rojo-vivo);
+
+    border: 1px solid var(--contacto-rojo-vivo);
+    border-radius: 9px;
+
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 750;
+    line-height: 1.4;
+
+    text-decoration: none;
+    text-align: center;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+a.sinacin-contacto-maps-btn:hover {
+    background: var(--contacto-rojo-vivo);
+    color: #ffffff;
+}
+
+.sinacin-contacto-maps-inactivo {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ==========================================
+   13. TABLETS
+========================================== */
+
+@media (max-width: 1100px) {
+
+    .sinacin-contacto-layout {
+        grid-template-columns:
+            minmax(0, 1.2fr)
+            minmax(0, 1fr);
+        gap: 18px;
+    }
+
+    .sinacin-contacto-panel {
+        padding: 25px;
+    }
+
+    .sinacin-contacto-campos-dobles {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .sinacin-contacto-ubicacion {
+        grid-template-columns:
+            minmax(0, 60fr)
+            minmax(0, 40fr);
+    }
+
+    .sinacin-contacto-ubicacion-info {
+        padding: 28px;
+    }
+
+    .sinacin-contacto-red {
+        flex-basis: 45px;
+        width: 45px;
+        height: 45px;
+    }
+}
+
+/* ==========================================
+   14. TABLETS PEQUEÑAS
+========================================== */
+
+@media (max-width: 850px) {
+
+    .sinacin-contacto-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sinacin-contacto-campos-dobles {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .sinacin-contacto-lateral {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .sinacin-contacto-datos {
+        display: grid;
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        gap: 24px;
+    }
+
+    .sinacin-contacto-ubicacion {
+        grid-template-columns: 1fr;
+    }
+
+    .sinacin-contacto-mapa,
+    .sinacin-contacto-mapa iframe,
+    .sinacin-contacto-mapa-pendiente {
+        min-height: 280px;
+    }
+}
+
+/* ==========================================
+   15. CELULARES
+========================================== */
+
+@media (max-width: 600px) {
+
+    .sinacin-contacto {
+        padding: 28px 0 45px;
+    }
+
+    .sinacin-contacto > .container {
+        width: 92%;
+    }
+
+    /* Encabezado */
+
+    .sinacin-contacto-encabezado {
+        margin-bottom: 28px;
+    }
+
+    .sinacin-contacto
+    .sinacin-contacto-titulo-principal {
+        gap: 12px;
+        font-size: 29px;
+    }
+
+    .sinacin-contacto-titulo-principal::before,
+    .sinacin-contacto-titulo-principal::after {
+        flex-basis: 35px;
+        height: 2px;
+    }
+
+    .sinacin-contacto-encabezado p {
+        font-size: 14px;
+    }
+
+    /* Distribución */
+
+    .sinacin-contacto-layout {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .sinacin-contacto-panel {
+        padding: 24px 20px;
+        border-radius: 13px;
+    }
+
+    /* Títulos */
+
+    .sinacin-contacto-titulo h1,
+    .sinacin-contacto-titulo h2 {
+        font-size: 23px;
+    }
+
+    /* Formulario */
+
+    .sinacin-contacto-campos-dobles {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .sinacin-contacto-form {
+        gap: 20px;
+    }
+
+    .sinacin-contacto-campo label {
+        font-size: 14px;
+    }
+
+    .sinacin-contacto-campo input,
+    .sinacin-contacto-campo select,
+    .sinacin-contacto-campo textarea {
+        font-size: 14px;
+    }
+
+    .sinacin-contacto-campo textarea {
+        min-height: 150px;
+    }
+
+    .sinacin-contacto-form-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+
+    .sinacin-contacto-enviar {
+        width: 100%;
+    }
+
+    /* Información */
+
+    .sinacin-contacto-datos {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .sinacin-contacto-dato h3 {
+        font-size: 15px;
+    }
+
+    .sinacin-contacto-dato p {
+        font-size: 14px;
+    }
+
+    /* Redes */
+
+    .sinacin-contacto-redes {
+        justify-content: space-around;
+        gap: 12px;
+    }
+
+    .sinacin-contacto-red {
+        flex-basis: 46px;
+        width: 46px;
+        height: 46px;
+    }
+
+    /* Ubicación */
+
+    .sinacin-contacto-ubicacion {
+        grid-template-columns: 1fr;
+        margin-top: 24px;
+        border-radius: 16px;
+    }
+
+    .sinacin-contacto-mapa,
+    .sinacin-contacto-mapa iframe,
+    .sinacin-contacto-mapa-pendiente {
+        min-height: 250px;
+    }
+
+    .sinacin-contacto-ubicacion-info {
+        padding: 28px 24px;
+    }
+
+    .sinacin-contacto-ubicacion-info > p {
+        font-size: 15px;
+    }
+}
+
+/* ==========================================
+   16. CELULARES MUY PEQUEÑOS
+========================================== */
+
+@media (max-width: 380px) {
+
+    .sinacin-contacto
+    .sinacin-contacto-titulo-principal {
+        font-size: 26px;
+        gap: 8px;
+    }
+
+    .sinacin-contacto-titulo-principal::before,
+    .sinacin-contacto-titulo-principal::after {
+        flex-basis: 24px;
+    }
+
+    .sinacin-contacto-panel {
+        padding: 20px 16px;
+    }
+
+    .sinacin-contacto-red {
+        flex-basis: 42px;
+        width: 42px;
+        height: 42px;
+    }
+
+    .sinacin-contacto-red svg {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+/* ==========================================
+   17. ACCESIBILIDAD
+========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .sinacin-contacto-enviar,
+    .sinacin-contacto-red,
+    .sinacin-contacto-maps-btn,
+    .sinacin-contacto-campo input,
+    .sinacin-contacto-campo select,
+    .sinacin-contacto-campo textarea {
+        transition: none;
+    }
+}
+
+.sinacin-contacto-red i {
+    font-size: 25px;
+    line-height: 1;
+}
+
+.sinacin-contacto-exito {
+    text-align: center;
+    padding: 55px 25px;
+}
+
+.sinacin-contacto-exito i {
+    font-size: 65px;
+    color: #20a464;
+    margin-bottom: 22px;
+}
+
+.sinacin-contacto-exito h2 {
+    font-size: 27px;
+    color: #171923;
+    margin-bottom: 15px;
+}
+
+.sinacin-contacto-exito p {
+    font-size: 16px;
+    color: #667085;
+    line-height: 1.7;
+}
+
+/* =====================================
+   SINACIN - ILUSTRACIÓN CONTACTO
+===================================== */
+
+.sinacin-contacto-ilustracion {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    width: 100%;
+    margin: 20px auto 0;
+    padding: 10px 15px 0;
+
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+    overflow: visible;
+}
+
+.sinacin-contacto-ilustracion img {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Adaptación a celulares */
+@media (max-width: 768px) {
+    .sinacin-contacto-ilustracion {
+        margin-top: 15px;
+        padding: 10px 0;
+    }
+
+    .sinacin-contacto-ilustracion img {
+        max-width: 260px;
+    }
+}
+
+/* =========================================
+   SINACIN - ICONOS OFICIALES REDES SOCIALES
+========================================= */
+
+.sinacin-red-icono {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+
+    background: #B30820;
+    color: #ffffff;
+
+    border-radius: 50%;
+}
+
+.sinacin-red-icono i {
+    font-size: 16px;
+    line-height: 1;
+    color: #ffffff;
+}
+
+.sinacin-red-social {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.sinacin-red-social:hover .sinacin-red-icono {
+    background: #850B1D;
+}
+
+/* =====================================
+   SINACIN - PRESIDENTE Y FOTOGRAFÍA
+===================================== */
+
+.sinacin-columna-header .sinacin-columna-firma {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    align-items: center;
+    gap: 35px;
+
+    width: 100%;
+    max-width: 850px;
+    margin: 35px auto 45px;
+}
+
+/* Nombre y cargo a la izquierda */
+.sinacin-columna-header .sinacin-columna-autor {
+    margin: 0;
+    text-align: left;
+}
+
+.sinacin-columna-autor strong {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    color: #22232a;
+}
+
+.sinacin-columna-autor span {
+    display: block;
+    margin-top: 8px;
+    font-size: 15px;
+    color: #777;
+}
+
+/* Fotografía grande 16:9 */
+.sinacin-columna-foto {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+
+    object-fit: cover;
+    object-position: center 35%;
+
+    border-radius: 12px;
+    border: 4px solid #ffffff;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+/* Adaptación para celulares */
+@media (max-width: 600px) {
+    .sinacin-columna-header .sinacin-columna-firma {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        max-width: 100%;
+        margin: 25px auto 35px;
+    }
+
+    .sinacin-columna-header .sinacin-columna-autor {
+        text-align: center;
+    }
+
+    .sinacin-columna-foto {
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+    }
+}
+
+/* ==========================================
+   SINACIN - TIPOGRAFÍA INSTITUCIONAL
+========================================== */
+
+:root {
+    --sinacin-font: 'Manrope', sans-serif;
+}
+
+/* Tipografía general */
+body,
+button,
+input,
+textarea,
+select {
+    font-family: var(--sinacin-font);
+}
+
+/* Encabezados */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--sinacin-font);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
+}
+
+/* Párrafos */
+p, li {
+    font-family: var(--sinacin-font);
+    line-height: 1.7;
+}
+
+/* Menú de navegación */
+nav a,
+.menu a {
+    font-family: var(--sinacin-font);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+/* Botones */
+button,
+input[type="submit"],
+.btn,
+.sinacin-btn {
+    font-family: var(--sinacin-font);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+

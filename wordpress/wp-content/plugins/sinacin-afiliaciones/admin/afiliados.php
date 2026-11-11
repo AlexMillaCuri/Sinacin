@@ -917,6 +917,167 @@ function sinacin_procesar_operacion_masiva_afiliados() {
 }
 
 /* =========================================================
+ * EXPORTACIÓN EXCEL (.XLSX) - EMPRESA / FAENA
+ * ========================================================= */
+add_action( 'admin_init', 'sinacin_exportar_nomina_excel', 1 );
+
+function sinacin_exportar_nomina_excel() {
+    if ( ! isset( $_GET['sinacin_exportar_excel'] ) ) {
+        return;
+    }
+    if ( ! current_user_can( 'sinacin_gestionar_afiliaciones' ) ) {
+        wp_die( 'No tienes permisos para exportar afiliados.', '', array( 'response' => 403 ) );
+    }
+    $nonce = isset( $_GET['_sinacin_excel_nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_sinacin_excel_nonce'] ) ) : '';
+    if ( ! wp_verify_nonce( $nonce, 'sinacin_exportar_excel' ) ) {
+        wp_die( 'La solicitud de descarga no es válida.', '', array( 'response' => 403 ) );
+    }
+    if ( ! class_exists( 'ZipArchive' ) ) {
+        wp_die( 'La extensión PHP ZipArchive no está habilitada en el servidor. Solicita activar la extensión zip para generar archivos XLSX.' );
+    }
+
+    global $wpdb;
+    $personas = $wpdb->prefix . 'sinacin_personas';
+    $afiliaciones = $wpdb->prefix . 'sinacin_afiliaciones';
+    $empresas = $wpdb->prefix . 'sinacin_empresas';
+    $faenas = $wpdb->prefix . 'sinacin_faenas';
+
+    $empresa_id = isset( $_GET['empresa_id'] ) ? absint( $_GET['empresa_id'] ) : 0;
+    $faena_id = isset( $_GET['faena_id'] ) ? absint( $_GET['faena_id'] ) : 0;
+    $estado = isset( $_GET['estado'] ) ? sanitize_text_field( wp_unslash( $_GET['estado'] ) ) : 'ACTIVA';
+    $buscar = isset( $_GET['buscar'] ) ? sanitize_text_field( wp_unslash( $_GET['buscar'] ) ) : '';
+    if ( ! in_array( $estado, array( '', 'ACTIVA', 'DESAFILIADA' ), true ) ) {
+        wp_die( 'Estado de afiliación no válido.' );
+    }
+    if ( $faena_id && ! $empresa_id ) {
+        wp_die( 'Para exportar una faena debes seleccionar su empresa.' );
+    }
+    if ( $empresa_id ) {
+        $existe_empresa = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$empresas} WHERE id = %d", $empresa_id ) );
+        if ( ! $existe_empresa ) {
+            wp_die( 'La empresa seleccionada no existe.' );
+        }
+    }
+    if ( $faena_id ) {
+        $existe_faena = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$faenas} WHERE id = %d AND empresa_id = %d", $faena_id, $empresa_id ) );
+        if ( ! $existe_faena ) {
+            wp_die( 'La faena no pertenece a la empresa seleccionada.' );
+        }
+    }
+
+    $where = 'WHERE 1=1';
+    $params = array();
+    if ( $estado !== '' ) {
+        $where .= ' AND a.estado = %s';
+        $params[] = $estado;
+    }
+    if ( $empresa_id ) {
+        $where .= ' AND a.empresa_id = %d';
+        $params[] = $empresa_id;
+    }
+    if ( $faena_id ) {
+        $where .= ' AND a.faena_id = %d';
+        $params[] = $faena_id;
+    }
+    if ( $buscar !== '' ) {
+        $rut_buscar = strtoupper( preg_replace( '/[^0-9K]/i', '', $buscar ) );
+        $where .= " AND (CONCAT_WS(' ', p.nombres, p.apellido_paterno, p.apellido_materno) LIKE %s";
+        $params[] = '%' . $wpdb->esc_like( $buscar ) . '%';
+        if ( $rut_buscar !== '' ) {
+            $where .= " OR UPPER(REPLACE(REPLACE(REPLACE(p.rut, '.', ''), '-', ''), ' ', '')) LIKE %s";
+            $params[] = '%' . $wpdb->esc_like( $rut_buscar ) . '%';
+        }
+        $where .= ')';
+    }
+
+    $sql = "SELECT p.nombres, p.apellido_paterno, p.apellido_materno, p.rut,
+                   p.celular, p.correo, p.cargo, e.nombre_empresa, f.nombre_faena,
+                   a.estado, a.fecha_afiliacion, a.fecha_desafiliacion
+            FROM {$afiliaciones} a
+            INNER JOIN {$personas} p ON p.id = a.persona_id
+            INNER JOIN {$empresas} e ON e.id = a.empresa_id
+            INNER JOIN {$faenas} f ON f.id = a.faena_id
+            {$where}
+            ORDER BY e.nombre_empresa ASC, f.nombre_faena ASC,
+                     p.apellido_paterno ASC, p.apellido_materno ASC, p.nombres ASC, a.id ASC";
+    $registros = $wpdb->get_results( $params ? $wpdb->prepare( $sql, $params ) : $sql );
+    if ( $wpdb->last_error ) {
+        wp_die( 'No fue posible consultar los afiliados para exportación.' );
+    }
+    if ( count( $registros ) > 100000 ) {
+        wp_die( 'La exportación supera el límite de 100.000 registros. Reduce los filtros.' );
+    }
+
+    $headers = array( 'Nombre completo', 'RUT', 'Empresa', 'Faena / Obra', 'Cargo', 'Celular', 'Correo electrónico', 'Fecha afiliación', 'Estado', 'Fecha desafiliación' );
+    $filas = array( $headers );
+    foreach ( $registros as $r ) {
+        $filas[] = array(
+            trim( $r->nombres . ' ' . $r->apellido_paterno . ' ' . $r->apellido_materno ),
+            sinacin_afiliados_formatear_rut( $r->rut ),
+            $r->nombre_empresa, $r->nombre_faena, $r->cargo, $r->celular,
+            $r->correo, $r->fecha_afiliacion, $r->estado, $r->fecha_desafiliacion,
+        );
+    }
+
+    $xml_escape = static function ( $value ) {
+        $value = (string) ( $value ?? '' );
+        // Eliminar caracteres prohibidos en XML 1.0, conservando acentos y UTF-8.
+        $value = wp_check_invalid_utf8( $value, true );
+        $value = preg_replace( '/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/', '', $value );
+        return htmlspecialchars( $value, ENT_XML1 | ENT_QUOTES, 'UTF-8' );
+    };
+    $columnas = array( 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J' );
+    $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $sheet .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+    $sheet .= '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    $sheet .= '<cols><col min="1" max="1" width="33" customWidth="1"/><col min="2" max="2" width="18" customWidth="1"/><col min="3" max="4" width="30" customWidth="1"/><col min="5" max="7" width="24" customWidth="1"/><col min="8" max="10" width="20" customWidth="1"/></cols><sheetData>';
+    foreach ( $filas as $index => $fila ) {
+        $numero = $index + 1;
+        $sheet .= '<row r="' . $numero . '">';
+        foreach ( $fila as $col => $valor ) {
+            // inlineStr impide que valores externos se interpreten como fórmulas.
+            $sheet .= '<c r="' . $columnas[ $col ] . $numero . '" t="inlineStr"' . ( $index === 0 ? ' s="1"' : '' ) . '><is><t xml:space="preserve">' . $xml_escape( $valor ) . '</t></is></c>';
+        }
+        $sheet .= '</row>';
+    }
+    $sheet .= '</sheetData><autoFilter ref="A1:J' . count( $filas ) . '"/></worksheet>';
+
+    $zip = new ZipArchive();
+    $temporal = wp_tempnam( 'sinacin-nomina.xlsx' );
+    if ( ! $temporal || $zip->open( $temporal, ZipArchive::CREATE | ZipArchive::OVERWRITE ) !== true ) {
+        wp_die( 'No fue posible crear el archivo Excel temporal.' );
+    }
+    $zip->addFromString( '[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' );
+    $zip->addFromString( '_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' );
+    $zip->addFromString( 'xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Nómina SINACIN" sheetId="1" r:id="rId1"/></sheets></workbook>' );
+    $zip->addFromString( 'xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' );
+    $zip->addFromString( 'xl/styles.xml', '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB30820"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' );
+    $zip->addFromString( 'xl/worksheets/sheet1.xml', $sheet );
+    if ( ! $zip->close() ) {
+        @unlink( $temporal );
+        wp_die( 'No fue posible finalizar el archivo Excel.' );
+    }
+
+    $alcance = $faena_id ? 'faena-' . $faena_id : ( $empresa_id ? 'empresa-' . $empresa_id : 'todas-las-empresas' );
+    $nombre = sanitize_file_name( 'SINACIN-nomina-' . $alcance . '-' . wp_date( 'Y-m-d' ) . '.xlsx' );
+    if ( headers_sent() ) {
+        @unlink( $temporal );
+        wp_die( 'No fue posible iniciar la descarga: ya se enviaron encabezados.' );
+    }
+    while ( ob_get_level() ) {
+        ob_end_clean();
+    }
+    nocache_headers();
+    header( 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' );
+    header( 'Content-Disposition: attachment; filename="' . $nombre . '"' );
+    header( 'Content-Length: ' . filesize( $temporal ) );
+    header( 'X-Content-Type-Options: nosniff' );
+    readfile( $temporal );
+    @unlink( $temporal );
+    exit;
+}
+
+/* =========================================================
  * PÁGINA PRINCIPAL
  * ========================================================= */
 
@@ -1404,6 +1565,27 @@ function sinacin_pagina_afiliados() {
         </form>
 
 
+        <?php
+        // Exportar exactamente los filtros actuales, sin límite de paginación.
+        $sinacin_url_excel = add_query_arg(
+            array(
+                'sinacin_exportar_excel' => 1,
+                'empresa_id' => $empresa_filtro,
+                'faena_id' => $faena_filtro,
+                'estado' => $estado,
+                'buscar' => $buscar,
+                '_sinacin_excel_nonce' => wp_create_nonce( 'sinacin_exportar_excel' ),
+            ),
+            admin_url( 'admin.php' )
+        );
+        ?>
+        <div class="sinacin-exportacion-excel">
+            <span class="description">Exporta todos los resultados según empresa, faena, estado y búsqueda.</span>
+            <a class="button button-primary" id="sinacin-descargar-excel" href="<?php echo esc_url( $sinacin_url_excel ); ?>">
+                Descargar nómina Excel (.xlsx)
+            </a>
+        </div>
+
         <!-- ==========================================
              RESUMEN
              ========================================== -->
@@ -1727,8 +1909,8 @@ function sinacin_pagina_afiliados() {
                                 </td>
 
 
-                                <td>
-
+                                <td class="sinacin-acciones-celda">
+                                    <div class="sinacin-acciones-grupo">
                                     <a
                                         href="<?php echo esc_url(
                                             $url_detalle
@@ -1767,7 +1949,7 @@ function sinacin_pagina_afiliados() {
                                         </a>
 
                                     <?php endif; ?>
-
+                                    </div>
                                 </td>
 
                             </tr>
@@ -1842,6 +2024,17 @@ function sinacin_pagina_afiliados() {
 
 
     <style>
+
+        /* Barra de exportación alineada al extremo derecho. */
+        .sinacin-exportacion-excel { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:12px 0 18px; flex-wrap:wrap; }
+        .sinacin-exportacion-excel .description { flex:1 1 260px; }
+        .sinacin-exportacion-excel .button { margin-left:auto; white-space:nowrap; }
+        /* Botones de acciones alineados y consistentes en todas las filas. */
+        .sinacin-tabla-afiliados th:last-child, .sinacin-tabla-afiliados td.sinacin-acciones-celda { width:210px; }
+        .sinacin-acciones-grupo { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; align-content:start; }
+        .sinacin-acciones-grupo .button { text-align:center; margin:0; min-height:29px; height:auto; padding:2px 6px; line-height:23px; white-space:normal; }
+        .sinacin-acciones-grupo .button:last-child:nth-child(odd) { grid-column:1 / -1; }
+        @media screen and (max-width:782px) { .sinacin-exportacion-excel { align-items:stretch; } .sinacin-exportacion-excel .button { margin-left:0; text-align:center; } }
 
         .sinacin-filtros {
             display: flex;
@@ -1926,6 +2119,36 @@ function sinacin_pagina_afiliados() {
     </style>
     <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Confirmación explícita antes de iniciar la descarga.
+        document.addEventListener('click', function (evento) {
+            var enlace = evento.target.closest('#sinacin-descargar-excel');
+            if (!enlace) return;
+            var filtros = document.querySelector('.sinacin-filtros');
+            if (!filtros) return;
+            var empresa = filtros.querySelector('[name="empresa_id"]');
+            var faena = filtros.querySelector('[name="faena_id"]');
+            var estado = filtros.querySelector('[name="estado"]');
+            var buscar = filtros.querySelector('[name="buscar"]');
+            var etiqueta = function (selector, defecto) {
+                return selector && selector.selectedOptions.length ? selector.selectedOptions[0].textContent.trim() : defecto;
+            };
+            var contador = document.querySelector('.sinacin-resumen-afiliados strong');
+            var mensaje = '¿Deseas descargar la nómina Excel con los filtros establecidos?\n\n' +
+                'Empresa: ' + etiqueta(empresa, 'Todas las empresas') + '\n' +
+                'Faena: ' + etiqueta(faena, 'Todas las faenas') + '\n' +
+                'Estado: ' + etiqueta(estado, 'Todos los estados') + '\n' +
+                'Búsqueda: ' + (buscar && buscar.value.trim() ? buscar.value.trim() : 'Sin búsqueda') + '\n' +
+                'Registros encontrados: ' + (contador ? contador.textContent.trim() : 'No disponible') + '\n\n' +
+                'Presiona Aceptar para descargar o Cancelar para volver.';
+            if (!window.confirm(mensaje)) { evento.preventDefault(); return; }
+            // Capturar los filtros vigentes incluso si hay una actualización AJAX pendiente.
+            var url = new URL(enlace.href, window.location.href);
+            ['empresa_id', 'faena_id', 'estado', 'buscar'].forEach(function (clave) {
+                var campo = filtros.querySelector('[name="' + clave + '"]');
+                if (campo) url.searchParams.set(clave, campo.value);
+            });
+            enlace.href = url.toString();
+        });
         var form = document.querySelector('.sinacin-filtros');
         if (!form) return;
         var campo = form.querySelector('[name="buscar"]');
@@ -1987,6 +2210,16 @@ function sinacin_pagina_afiliados() {
                     // Reflejar la selección efectiva en la URL para evitar filtros obsoletos.
                     url.searchParams.set('empresa_id', empresa.value);
                     url.searchParams.set('faena_id', faena.value);
+                     var enlaceExcel = document.getElementById('sinacin-descargar-excel');
+                     if (enlaceExcel) {
+                         var urlExcel = new URL(enlaceExcel.href);
+                         ['empresa_id', 'faena_id', 'estado', 'buscar'].forEach(function (clave) {
+                             urlExcel.searchParams.set(clave, clave === 'empresa_id' ? empresa.value :
+                                 clave === 'faena_id' ? faena.value :
+                                 clave === 'estado' ? estado.value : campo.value);
+                         });
+                         enlaceExcel.href = urlExcel.toString();
+                     }
                     var nuevoOrden = documento.querySelector('.sinacin-filtros [name="ordenar"]');
                     var nuevaDireccion = documento.querySelector('.sinacin-filtros [name="direccion"]');
                     if (nuevoOrden) form.querySelector('[name="ordenar"]').value = nuevoOrden.value;

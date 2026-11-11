@@ -40,35 +40,35 @@
                 <div class="sinacin-footer-redes"
                      aria-label="Redes sociales SINACIN">
 
-                    <a href="https://www.facebook.com/"
+                    <a href="https://www.facebook.com/profile.php?id=100057304974547"
                        target="_blank"
                        rel="noopener noreferrer"
                        aria-label="Facebook">
                         <i class="fa-brands fa-facebook-f" aria-hidden="true"></i>
                     </a>
 
-                    <a href="https://www.instagram.com/"
+                    <a href="https://www.instagram.com/sinacin.chile"
                        target="_blank"
                        rel="noopener noreferrer"
                        aria-label="Instagram">
                         <i class="fa-brands fa-instagram" aria-hidden="true"></i>
                     </a>
 
-                    <a href="https://www.youtube.com/"
+                    <a href="https://www.youtube.com/@sinacinchile141"
                        target="_blank"
                        rel="noopener noreferrer"
                        aria-label="YouTube">
                         <i class="fa-brands fa-youtube" aria-hidden="true"></i>
                     </a>
 
-                    <a href="https://x.com/"
+                    <a href="https://x.com/SinacinChile"
                        target="_blank"
                        rel="noopener noreferrer"
                        aria-label="X">
                         <i class="fa-brands fa-x-twitter" aria-hidden="true"></i>
                     </a>
 
-                    <a href="https://t.me/"
+                    <a href="https://t.me/SinaciNoticias"
                        target="_blank"
                        rel="noopener noreferrer"
                        aria-label="Telegram">
@@ -88,8 +88,13 @@
                         <li><a href="<?php echo esc_url(home_url('/')); ?>">Inicio</a></li>
                         <li><a href="<?php echo esc_url(home_url('/nosotros/')); ?>">Nosotros</a></li>
                         <li><a href="<?php echo esc_url(home_url('/noticias/')); ?>">Noticias</a></li>
-                        <li><a href="<?php echo esc_url(home_url('/unete-con-nosotros/')); ?>">Afíliate</a></li>
-                        <li><a href="<?php echo esc_url(home_url('/finiquitos/')); ?>">Finiquitos</a></li>
+                        <li><a href="<?php echo esc_url(home_url('/contacto/')); ?>">Contacto</a></li>
+                        <li><a href="<?php echo esc_url(home_url('/sinacin_formulario/')); ?>">Afíliate</a></li>
+                        <li>
+                            <a href="https://intranet.sinacin.cl/" target="_blank" rel="noopener noreferrer">
+                                Finiquitos
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>

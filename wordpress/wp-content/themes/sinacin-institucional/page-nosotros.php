@@ -148,22 +148,22 @@ $contador = 0;
             array(
                 'nombre' => 'Miguel Barrera',
                 'cargo'  => 'Presidente',
-                'foto'   => '',
+                'foto'   => 'http://localhost:8080/wp-content/themes/sinacin-institucional/assets/images/miguel_barrera.jpg',
             ),
             array(
                 'nombre' => 'Ismael Toro',
                 'cargo'  => 'Secretario',
-                'foto'   => '',
+                'foto'   => 'http://localhost:8080/wp-content/uploads/2026/11/ismael_toro.jpg',
             ),
             array(
                 'nombre' => 'Gonzalo Gutierrez',
                 'cargo'  => 'Tesorero',
-                'foto'   => '',
+                'foto'   => 'http://localhost:8080/wp-content/uploads/2026/11/gonzalo_gutierrez.jpg',
             ),
             array(
                 'nombre' => 'Valentina Vegas',
                 'cargo'  => 'Director',
-                'foto'   => '',
+                'foto'   => 'http://localhost:8080/wp-content/uploads/2026/11/valentina_vegas.jpg',
             ),
             array(
                 'nombre' => 'Luis Burgos',

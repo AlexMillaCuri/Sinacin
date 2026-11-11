@@ -196,6 +196,17 @@ function sinacin_ajax_validar_empresa() {
  */
 
 function sinacin_mostrar_formulario() {
+    // El script se imprime en el pie de página, después del formulario.
+    wp_enqueue_script(
+        'sinacin-cloudflare-turnstile',
+        'https://challenges.cloudflare.com/turnstile/v0/api.js',
+        array(),
+        null,
+        true
+    );
+    $turnstile_site_key = function_exists('sinacin_turnstile_site_key')
+        ? sinacin_turnstile_site_key()
+        : '';
     $base_imagenes = plugins_url( '../assets/images/', __FILE__ );
     ob_start();
     ?>
@@ -210,6 +221,8 @@ function sinacin_mostrar_formulario() {
         <section class="sinacin-seccion" aria-labelledby="sinacin-titulo-empresa">
           <h3 id="sinacin-titulo-empresa">Empresa y lugar de trabajo</h3>
           <p class="sinacin-ayuda-seccion">Primero valida el RUT de tu empresa para continuar.</p>
+          <p class="sinacin-ayuda-seccion"><b></b></p>
+          <h3 id="sinacin-titulo-empresa">En caso de desconocer el RUT de la empresa, se recomienda contactar a su delegado, al encargado de Relaciones Laborales o revisar su contrato de trabajo.</h3>
           <div class="sinacin-campo">
             <label for="rut_empresa">RUT de empresa <span aria-hidden="true">*</span></label>
             <input type="text" id="rut_empresa" name="rut_empresa" placeholder="Ej.: 76.123.456-7" maxlength="12" required autocomplete="off" inputmode="text">
@@ -248,6 +261,13 @@ function sinacin_mostrar_formulario() {
           </div>
         </section>
         <div class="sinacin-privacidad">Tus antecedentes serán utilizados para gestionar tu solicitud de afiliación. Verifica que tus datos sean correctos antes de enviarlos.</div>
+        <?php if ( $turnstile_site_key !== '' ) : ?>
+          <div class="sinacin-turnstile-contenedor" style="margin:0 0 22px;display:flex;justify-content:center;">
+            <div class="cf-turnstile" data-sitekey="<?php echo esc_attr( $turnstile_site_key ); ?>"></div>
+          </div>
+        <?php else : ?>
+          <p role="alert" style="color:#922e38;margin:0 0 22px;">La verificación de seguridad no está configurada. Contacta al administrador.</p>
+        <?php endif; ?>
         <button type="submit" id="sinacin-boton-enviar" disabled>Enviar solicitud de afiliación</button>
         <div id="sinacin-mensaje-general" role="status" aria-live="polite" hidden></div>
       </form>
@@ -379,8 +399,9 @@ function sinacin_mostrar_formulario() {
               confirmacion.scrollIntoView({behavior:'smooth',block:'center'});
               return;
             }
-            mensaje(j.data?.message||'No fue posible enviar la solicitud.');
-          }catch(e){mensaje('Ocurrió un error al enviar la solicitud. Inténtalo nuevamente.')}
+            if(window.turnstile){try{window.turnstile.reset(f.querySelector('.cf-turnstile'))}catch(e){}}
+             mensaje(j.data?.message||'No fue posible enviar la solicitud.');
+          }catch(e){if(window.turnstile){try{window.turnstile.reset(f.querySelector('.cf-turnstile'))}catch(e){}}mensaje('Ocurrió un error al enviar la solicitud. Inténtalo nuevamente.')}
           finally{enviando=false;boton.textContent='Enviar solicitud de afiliación';actualizar()}
         });
         bloquear();
@@ -471,6 +492,17 @@ function sinacin_procesar_solicitud() {
 
     }
 
+
+    /**
+     * Verificar Turnstile antes de procesar datos personales,
+     * subir la cédula o guardar registros en la base de datos.
+     * Reutiliza la validación del tema SINACIN.
+     */
+    if ( ! function_exists( 'sinacin_turnstile_verificar' ) || ! sinacin_turnstile_verificar() ) {
+        sinacin_respuesta_error(
+            'No se pudo completar la verificación de seguridad. Inténtalo nuevamente.'
+        );
+    }
 
     /**
      * ------------------------------------------

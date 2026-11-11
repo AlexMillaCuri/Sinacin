@@ -1461,7 +1461,7 @@ function sinacin_pagina_empresas() {
         <h1 class="wp-heading-inline">
             Empresas SINACIN
         </h1>
-
+        <button type="button" class="page-title-action" id="sinacin-registrar-empresa">+ Registrar empresa</button>
 
         <hr class="wp-header-end">
 
@@ -1485,29 +1485,17 @@ function sinacin_pagina_empresas() {
              FORMULARIO
              ========================================== -->
 
-        <div
-            style="
-                background:#fff;
-                border:1px solid #dcdcde;
-                padding:20px;
-                margin:20px 0;
-                max-width:900px;
-            "
-        >
-
-            <h2>
-
-                <?php
-
-                echo $empresa_editar
-                    ? 'Editar empresa'
-                    : 'Registrar nueva empresa';
-
-                ?>
-
-            </h2>
-
-
+        <div id="sinacin-empresa-modal" class="sinacin-modal-overlay" aria-hidden="true">
+          <div class="sinacin-modal sinacin-empresa-dialog" role="dialog" aria-modal="true" aria-labelledby="sinacin-empresa-titulo" tabindex="-1">
+            <div class="sinacin-modal-header">
+              <div><h2 id="sinacin-empresa-titulo"><?php echo $empresa_editar ? 'Editar empresa' : 'Registrar nueva empresa'; ?></h2>
+              <p>Completa los datos de la empresa para SINACIN.</p></div>
+              <button type="button" class="sinacin-modal-close sinacin-cerrar-empresa" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="sinacin-modal-body">
+            <?php if ( $mensaje !== '' && $tipo_mensaje === 'error' && ! $mensaje_en_modal_faenas ) : ?>
+              <div class="notice notice-error inline"><p><?php echo esc_html( $mensaje ); ?></p></div>
+            <?php endif; ?>
             <form
                 method="post"
             >
@@ -1696,40 +1684,40 @@ function sinacin_pagina_empresas() {
                 </table>
 
 
-                <?php
-
-                submit_button(
-                    $empresa_editar
-                        ? 'Actualizar empresa'
-                        : 'Registrar empresa'
-                );
-
-                ?>
-
-
-                <?php if ( $empresa_editar ) : ?>
-
-                    <a
-                        href="<?php
-                            echo esc_url(
-                                admin_url(
-                                    'admin.php?page=sinacin-empresas'
-                                )
-                            );
-                        ?>"
-                        class="button"
-                    >
-
-                        Cancelar edición
-
-                    </a>
-
-                <?php endif; ?>
+                <div class="sinacin-empresa-actions">
+                    <?php
+                    submit_button(
+                        $empresa_editar ? 'Actualizar empresa' : 'Registrar empresa',
+                        'primary',
+                        'submit',
+                        false
+                    );
+                    ?>
+                    <button type="button" class="button sinacin-cerrar-empresa">Cancelar</button>
+                </div>
 
             </form>
-
+            </div>
+          </div>
         </div>
-
+        <style>
+          .sinacin-empresa-dialog {max-width:650px;margin:auto;}
+          #sinacin-empresa-modal.is-open {align-items:center;}
+          #sinacin-empresa-modal .form-table th {width:155px;}
+          #sinacin-empresa-modal .form-table input.regular-text {width:100%;max-width:360px;}
+          #sinacin-empresa-modal .sinacin-empresa-actions {
+            display:flex;align-items:center;justify-content:flex-end;
+            gap:10px;flex-wrap:wrap;margin-top:24px;padding-top:18px;
+            border-top:1px solid #dcdcde;
+          }
+          #sinacin-empresa-modal .sinacin-empresa-actions .button,
+          #sinacin-empresa-modal .sinacin-empresa-actions .button-primary {
+            display:inline-flex;align-items:center;justify-content:center;
+            margin:0!important;min-height:38px;padding:0 16px;
+            width:auto;line-height:1.2;box-sizing:border-box;
+          }
+          @media(max-width:782px) {#sinacin-empresa-modal.is-open {align-items:flex-start;}#sinacin-empresa-modal .form-table th{width:auto;}}
+        </style>
 
         <?php
         /*
@@ -2543,7 +2531,11 @@ function sinacin_pagina_empresas() {
                                         );
 
                                     ?>"
-                                    class="button button-small"
+                                    class="button button-small sinacin-editar-empresa"
+                                    data-empresa-id="<?php echo esc_attr( $empresa->id ); ?>"
+                                    data-rut="<?php echo esc_attr( sinacin_formatear_rut( $empresa->rut_empresa ) ); ?>"
+                                    data-nombre="<?php echo esc_attr( $empresa->nombre_empresa ); ?>"
+                                    data-estado="<?php echo esc_attr( $empresa->estado ); ?>"
                                 >
 
                                     Editar
@@ -2670,6 +2662,81 @@ function sinacin_pagina_empresas() {
 
     </div>
 
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const modal = document.getElementById('sinacin-empresa-modal');
+      const dialog = modal && modal.querySelector('.sinacin-empresa-dialog');
+      const form = modal && modal.querySelector('form');
+      const create = document.getElementById('sinacin-registrar-empresa');
+      if (!modal || !form || !create) return;
+      const id = form.querySelector('[name="empresa_id"]');
+      const rut = form.querySelector('[name="rut_empresa"]');
+      const nombre = form.querySelector('[name="nombre_empresa"]');
+      const estado = form.querySelector('[name="estado"]');
+      const titulo = document.getElementById('sinacin-empresa-titulo');
+      const submit = form.querySelector('[type="submit"]');
+      let previousFocus = null;
+      function open() {
+        previousFocus = document.activeElement;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden','false');
+        document.body.classList.add('sinacin-modal-open');
+        if (dialog) dialog.focus();
+      }
+      function close() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden','true');
+        if (!document.getElementById('sinacin-faenas-modal')?.classList.contains('is-open')) document.body.classList.remove('sinacin-modal-open');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('editar');
+        window.history.replaceState({},'',url.toString());
+        if (previousFocus && document.contains(previousFocus)) previousFocus.focus();
+      }
+      create.addEventListener('click', function () {
+        form.reset(); id.value = '0'; rut.value = ''; nombre.value = ''; estado.value = 'ACTIVA';
+        titulo.textContent = 'Registrar nueva empresa';
+        if (submit) submit.value = 'Registrar empresa';
+        open(); rut.focus();
+      });
+      document.querySelectorAll('.sinacin-editar-empresa').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          id.value = btn.dataset.empresaId || '0';
+          rut.value = btn.dataset.rut || '';
+          nombre.value = btn.dataset.nombre || '';
+          estado.value = btn.dataset.estado || 'ACTIVA';
+          titulo.textContent = 'Editar empresa';
+          if (submit) submit.value = 'Actualizar empresa';
+          open(); nombre.focus();
+        });
+      });
+      modal.querySelectorAll('.sinacin-cerrar-empresa').forEach(function (btn) {btn.addEventListener('click',close);});
+      modal.addEventListener('click',function(e){if(e.target===modal)close();});
+      document.addEventListener('keydown',function(e){
+        if (!modal.classList.contains('is-open')) return;
+        if(e.key==='Escape'){e.preventDefault();close();}
+        if(e.key==='Tab'){
+          const els=Array.from(modal.querySelectorAll('button,a[href],input:not([type="hidden"]),select')).filter(x=>!x.disabled&&x.offsetParent!==null);
+          if(!els.length)return;
+          const first=els[0],last=els[els.length-1];
+          if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+          else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+        }
+      });
+      <?php if ( $empresa_editar || ( isset( $_POST['sinacin_guardar_empresa'] ) && $tipo_mensaje === 'error' ) ) : ?>
+        <?php if ( isset( $_POST['sinacin_guardar_empresa'] ) && $tipo_mensaje === 'error' ) : ?>
+          id.value = <?php echo wp_json_encode( isset($_POST['empresa_id']) ? absint($_POST['empresa_id']) : 0 ); ?>;
+          rut.value = <?php echo wp_json_encode( isset($_POST['rut_empresa']) ? sanitize_text_field(wp_unslash($_POST['rut_empresa'])) : '' ); ?>;
+          nombre.value = <?php echo wp_json_encode( isset($_POST['nombre_empresa']) ? sanitize_text_field(wp_unslash($_POST['nombre_empresa'])) : '' ); ?>;
+          estado.value = <?php echo wp_json_encode( isset($_POST['estado']) && in_array($_POST['estado'],array('ACTIVA','INACTIVA'),true) ? $_POST['estado'] : 'ACTIVA' ); ?>;
+          titulo.textContent = id.value !== '0' ? 'Editar empresa' : 'Registrar nueva empresa';
+          if (submit) submit.value = id.value !== '0' ? 'Actualizar empresa' : 'Registrar empresa';
+        <?php endif; ?>
+        open();
+      <?php endif; ?>
+    });
+    </script>
 
     <script>
 

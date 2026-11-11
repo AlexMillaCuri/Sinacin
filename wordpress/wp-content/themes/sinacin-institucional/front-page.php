@@ -33,10 +33,16 @@ get_header();
             $numero = 0;
             while ($banners->have_posts()) :
                 $banners->the_post();
+                $video_url = get_post_meta(get_the_ID(), '_sinacin_banner_video_url', true);
+                $video_id = function_exists('sinacin_banner_youtube_id')
+                    ? sinacin_banner_youtube_id($video_url) : '';
+                $video_posicion = get_post_meta(get_the_ID(), '_sinacin_banner_video_posicion', true);
+                $video_posicion = in_array($video_posicion, array('izquierda', 'derecha'), true)
+                    ? $video_posicion : 'derecha';
             ?>
 
             <article
-                class="sinacin-slide <?php echo $numero === 0 ? 'active' : ''; ?>"
+                class="sinacin-slide <?php echo $numero === 0 ? 'active' : ''; ?><?php echo $video_id ? ' sinacin-slide-con-video' : ''; ?>"
                 aria-hidden="<?php echo $numero === 0 ? 'false' : 'true'; ?>"
                 <?php echo $numero === 0 ? '' : 'inert'; ?>
             >
@@ -48,6 +54,19 @@ get_header();
                 <?php endif; ?>
 
                 <div class="sinacin-slide-overlay"></div>
+
+                <?php if ($video_id) : ?>
+                    <div class="sinacin-slide-video sinacin-slide-video--<?php echo esc_attr($video_posicion); ?>">
+                        <iframe
+                            src="<?php echo esc_url('https://www.youtube-nocookie.com/embed/' . $video_id . '?enablejsapi=1&rel=0'); ?>"
+                            title="Video de YouTube del banner <?php echo esc_attr(get_the_title()); ?>"
+                            loading="lazy"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            allowfullscreen
+                        ></iframe>
+                    </div>
+                <?php endif; ?>
 
                 <div class="container sinacin-slide-content">
                     <span class="sinacin-slide-label">
@@ -128,10 +147,10 @@ get_header();
             </p>
 
             <a
-                href="<?php echo esc_url(home_url('/unete-con-nosotros/')); ?>"
+                href="<?php echo esc_url(home_url('/sinacin_formulario/')); ?>"
                 class="sinacin-afiliacion-boton"
             >
-                AFÍLIATE AHORA
+                AFÍLIATE AQUÍ
                 <span aria-hidden="true">→</span>
             </a>
 
@@ -410,43 +429,68 @@ get_header();
 
                 <div class="sinacin-redes-enlaces">
 
-                    <a href="https://x.com/"
+                    <!-- X -->
+                    <a href="https://x.com/SinacinChile"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="sinacin-red-social">
-                        <span class="sinacin-red-icono">𝕏</span>
+
+                        <span class="sinacin-red-icono">
+                            <i class="fa-brands fa-x-twitter"></i>
+                        </span>
+
                         <span>X</span>
                     </a>
 
-                    <a href="https://www.instagram.com/"
+                    <!-- Instagram -->
+                    <a href="https://www.instagram.com/sinacin.chile/"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="sinacin-red-social">
-                        <span class="sinacin-red-icono">◎</span>
+
+                        <span class="sinacin-red-icono">
+                            <i class="fa-brands fa-instagram"></i>
+                        </span>
+
                         <span>Instagram</span>
                     </a>
 
-                    <a href="https://www.youtube.com/"
+                    <!-- YouTube -->
+                    <a href="https://www.youtube.com/@sinacinchile141"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="sinacin-red-social">
-                        <span class="sinacin-red-icono">▶</span>
+
+                        <span class="sinacin-red-icono">
+                            <i class="fa-brands fa-youtube"></i>
+                        </span>
+
                         <span>YouTube</span>
                     </a>
 
-                    <a href="https://www.facebook.com/"
+                    <!-- Facebook -->
+                    <a href="https://www.facebook.com/profile.php?id=100057304974547"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="sinacin-red-social">
-                        <span class="sinacin-red-icono">f</span>
+
+                        <span class="sinacin-red-icono">
+                            <i class="fa-brands fa-facebook-f"></i>
+                        </span>
+
                         <span>Facebook</span>
                     </a>
 
-                    <a href="https://telegram.org/"
+                    <!-- Telegram -->
+                    <a href="https://t.me/SinaciNoticias"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="sinacin-red-social">
-                        <span class="sinacin-red-icono">➤</span>
+
+                        <span class="sinacin-red-icono">
+                            <i class="fa-brands fa-telegram"></i>
+                        </span>
+
                         <span>Telegram</span>
                     </a>
 
@@ -485,10 +529,26 @@ get_header();
 
                 <div class="sinacin-columna-linea"></div>
 
-                <p class="sinacin-columna-autor">
-                    Miguel Barrera
-                    <span>Presidente SINACIN</span>
-                </p>
+                <div class="sinacin-columna-firma">
+                    <p class="sinacin-columna-autor">
+                        <strong>Miguel Barrera</strong>
+                        <span>Presidente SINACIN</span>
+                    </p>
+
+                    <?php
+                    $foto_presidente = get_template_directory() . '/assets/images/miguel-barrera.jpg';
+                    if (file_exists($foto_presidente)) :
+                    ?>
+                        <img
+                            class="sinacin-columna-foto"
+                            src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/miguel-barrera.jpg'); ?>"
+                            alt="Fotografía de Miguel Barrera, presidente de SINACIN"
+                            loading="lazy"
+                            width="130"
+                            height="130"
+                        >
+                    <?php endif; ?>
+                </div>
 
             </header>
 
