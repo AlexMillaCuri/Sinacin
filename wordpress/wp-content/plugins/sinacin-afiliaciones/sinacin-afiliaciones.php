@@ -33,6 +33,8 @@ require_once plugin_dir_path( __FILE__ ) . 'admin/historial.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/prueba-certificado.php';
 require_once plugin_dir_path( __FILE__ ) . 'admin/prueba-correo.php';
 
+require_once plugin_dir_path( __FILE__ ) . 'admin/importar-afiliados.php';
+
 
 /**
  * ==========================================

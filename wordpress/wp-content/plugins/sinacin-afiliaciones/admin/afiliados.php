@@ -2750,9 +2750,11 @@ function sinacin_mostrar_detalle_afiliado(
                     Solicitud:
                 </strong>
 
-                #<?php echo esc_html(
-                    $afiliado->solicitud_id
-                ); ?>
+                <?php if ( ! empty( $afiliado->solicitud_id ) ) : ?>
+                    #<?php echo esc_html( $afiliado->solicitud_id ); ?>
+                <?php else : ?>
+                    Importación administrativa
+                <?php endif; ?>
 
             </p>
 

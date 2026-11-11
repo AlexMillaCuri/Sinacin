@@ -1405,6 +1405,8 @@ if (
         </h1>
 
 
+        <button type="button" class="page-title-action" id="sinacin-abrir-importador">Importar afiliados</button>
+
         <hr class="wp-header-end">
 
 
@@ -1428,6 +1430,8 @@ if (
 
         <?php endif; ?>
 
+
+        <?php sinacin_importar_interfaz(); ?>
 
         <!-- ======================================
              FILTROS

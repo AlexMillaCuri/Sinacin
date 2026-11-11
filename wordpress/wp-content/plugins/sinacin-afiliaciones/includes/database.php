@@ -188,7 +188,7 @@ function sinacin_crear_tablas() {
 
         faena_id BIGINT UNSIGNED NOT NULL,
 
-        solicitud_id BIGINT UNSIGNED NOT NULL,
+        solicitud_id BIGINT UNSIGNED NULL,
 
         estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
 
