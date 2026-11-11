@@ -69,3 +69,6 @@ vendor/
 # ==========================================
 
 sinacin-private/
+
+wordpress/wp-content/plugins/sinacin-afiliaciones/admin/prueba-certificado.php
+wordpress/wp-content/plugins/sinacin-afiliaciones/admin/prueba-correo.php
